@@ -1,3 +1,12 @@
+*~
+.#*
+.DS_Store
+tmp/
+private/
+_build/
+logger*.yaml
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

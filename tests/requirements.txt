@@ -1,0 +1,5 @@
+pytest
+pytest-cov
+testfixtures
+coveralls
+tox

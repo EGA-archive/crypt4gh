@@ -32,13 +32,12 @@ Table of Contents
    Encryption           <encryption>
    Usage & Examples     <usage>
    Python Modules       <code>
-   Contributing         <CONTRIBUTING>
 
 
 |Travis| | Version |version| | Generated |today|
 
 
-.. |Travis| image:: https://travis-ci.org/NBISweden/LocalEGA-cryptor.svg?branch=master
+.. |Travis| image:: https://travis-ci.org/EGA-archive/LocalEGA-cryptor.svg?branch=master
 	:alt: Build Status
 	:class: inline-baseline
 

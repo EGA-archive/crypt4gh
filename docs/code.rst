@@ -10,8 +10,7 @@ Python Modules
 
     legacryptor.cli
     legacryptor.crypt4gh
-    legacryptor.pubring
-    legacryptor.exceptions
+    legacryptor.keys
 
 ************
 Command Line
@@ -26,13 +25,6 @@ Crypt4gh
 ********
 
 .. automodule:: legacryptor.crypt4gh
-   :members: Header, encrypt, get_header, decrypt, reencrypt, get_key_id, header_to_records
-
-************
-Pubring
-************
-
-.. automodule:: legacryptor.pubring
-   :members:
+   :members: Header, encrypt, decrypt, reencrypt
 
 :ref:`genindex` | :ref:`modindex`

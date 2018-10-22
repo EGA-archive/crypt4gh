@@ -59,8 +59,8 @@ current_year = str(datetime.date.today().year)
 
 # General information about the project.
 project = 'LocalEGA GA4GH cryptor'
-copyright = f'{current_year}, NBIS System Developers'
-author = 'NBIS System Developers'
+copyright = f'{current_year}, EGA System Developers'
+author = 'EGA System Developers'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

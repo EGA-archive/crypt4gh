@@ -1,5 +1,5 @@
 from setuptools import setup
-from legacryptor import __version__, __author__, __title__, __doc__ as lega_doc, __license__
+from crypt4gh import __version__, __author__, __title__, __doc__ as lega_doc, __license__
 
 setup(name='crypt4gh',
       version=__version__,
@@ -9,7 +9,7 @@ setup(name='crypt4gh',
       #author_email='frederic.haziza@crg.eu',
       description=__title__,
       long_description=lega_doc,
-      packages=['legacryptor'],
+      packages=['crypt4gh'],
       include_package_data=False,
       package_data={ 'crypt4gh': ['completion.bash'] },
       zip_safe=False,

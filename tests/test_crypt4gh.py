@@ -2,11 +2,7 @@ import os
 import unittest
 from testfixtures import tempdir
 
-import pgpy
-
-from legacryptor.exceptions import InvalidFormatError, VersionError, MDCError
-from legacryptor.crypt4gh import encrypt, decrypt, reencrypt, get_header, Header, get_key_id, do_nothing, header_to_records
-from . import pgp_data
+from crypt4gh.crypt4gh import encrypt, decrypt, reencrypt, Header
 
 
 class TestCrypt4GH(unittest.TestCase):

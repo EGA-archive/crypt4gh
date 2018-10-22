@@ -1,8 +1,8 @@
 import unittest
 import sys
 import os
-from legacryptor.cli import parse_args, __doc__
-from legacryptor.__main__ import main, run
+from crypt4gh.cli import parse_args, __doc__
+from crypt4gh.__main__ import main, run
 from . import logger_data, pgp_data
 from testfixtures import TempDirectory, tempdir
 from unittest import mock
@@ -17,7 +17,6 @@ class TestCommandLineARGS(unittest.TestCase):
     def setUp(self):
         """Setting things up."""
         self._dir = TempDirectory()
-        self._path = self._dir.write('pubring.bin', pgp_data.PGP_PUBKEY.encode('utf-8'))
         self._pk = self._dir.write('pub_key.asc', pgp_data.PGP_PUBKEY.encode('utf-8'))
         self._sk = self._dir.write('sec_key.asc', pgp_data.PGP_PRIVKEY.encode('utf-8'))
         self._crypted = self._dir.write('input.file', bytearray.fromhex(pgp_data.ENC_FILE))
@@ -49,7 +48,6 @@ class TestCommandLineARGS(unittest.TestCase):
                     '--keyid': None,
                     '--output': None,
                     '--pk': None,
-                    '--pubring': self._path,
                     '--server': None,
                     '--sk': None,
                     '-r': 'ega@crg.eu',
@@ -64,12 +62,6 @@ class TestCommandLineARGS(unittest.TestCase):
         """Run without commandline args, should exit."""
         with self.assertRaises(SystemExit):
             main()
-
-    @mock.patch('legacryptor.__main__.Pubring')
-    def test_cmdline_run_list_pubring(self, mock_ring):
-        """Listing with specific pubring should call the Pubring."""
-        run(['list', '--pubring', self._path])
-        mock_ring.assert_called()
 
     @mock.patch('legacryptor.__main__.encrypt')
     def test_cmdline_run_encrypt_pubring(self, mock_encrypt):

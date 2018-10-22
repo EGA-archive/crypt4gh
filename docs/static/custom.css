@@ -1,0 +1,32 @@
+body { overflow-x: initial !important; } /* Fix readthedocs bug */
+
+.bolditalic { font-weight: bold; font-style:italic; }
+
+/* footer * { display:none; } */
+/* footer > hr, */
+/* footer > div { display: block; } */
+
+
+/* #ega thead { valign:top; } */
+/* #ega tbody { valign:bottom; } */
+
+#ega { margin-bottom: 1.5em; }
+
+/* #ega tr th { font-size: 90%; margin: 0; overflow: visible; padding: 0.5em 1em; border: 1px solid #e1e4e5; text-align:left; white-space: initial; } */
+/* #ega tr th { font-weight: bold; border: 1px solid #e1e4e5; border-bottom-width:2px; } */
+/* #ega tr th:first-child { text-align:right; } */
+/* #ega tr th:last-child { text-align:center; } */
+
+/* #ega tbody tr:nth-child(odd){ background-color: #f3f6f6; } */
+
+#ega tr td { font-size: 90%; margin: 0; padding: 0.5em 1em; border: 1px solid #e1e4e5; text-align:left; white-space: initial; vertical-align:middle; }
+#ega tr td:first-child { text-align:right; border:none; font-weight:bold; font-variant: small-caps; }
+#ega tr td:last-child { text-align:center; border:none; }
+
+
+.ega-stable { color: green; }
+.ega-dev { color: orange; }
+.ega-unstable { color: red; }
+
+
+#ega thead{ display: none; }

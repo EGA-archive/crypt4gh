@@ -1,0 +1,8 @@
+# =====================================
+# Sphinx documentation
+# =====================================
+_build/
+static/*.key
+
+# These should be generated every time
+lega.utils/

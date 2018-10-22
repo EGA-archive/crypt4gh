@@ -4,7 +4,7 @@
 # You can set these variables from the command line.
 SPHINXOPTS    =
 SPHINXBUILD   = python -msphinx
-SPHINXPROJ    = LocalEGA-cryptor
+SPHINXPROJ    = crypt4gh
 SOURCEDIR     = .
 BUILDDIR      = _build
 

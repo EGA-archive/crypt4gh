@@ -2,21 +2,21 @@
 Python Modules
 --------------
 
-.. automodule:: legacryptor
+.. automodule:: crypt4gh
    :members:
-   :synopsis: The lega package contains code to start a *Local EGA cryptor*.
+   :synopsis: The package contains code to start a *EGA cryptor*.
 
 .. autosummary::
 
-    legacryptor.cli
-    legacryptor.crypt4gh
-    legacryptor.keys
+    crypt4gh.cli
+    crypt4gh.crypt4gh
+    crypt4gh.keys
 
 ************
 Command Line
 ************
 
-.. automodule:: legacryptor.cli
+.. automodule:: crypt4gh.cli
    :members:
 
 
@@ -24,7 +24,7 @@ Command Line
 Crypt4gh
 ********
 
-.. automodule:: legacryptor.crypt4gh
+.. automodule:: crypt4gh.crypt4gh
    :members: Header, encrypt, decrypt, reencrypt
 
 :ref:`genindex` | :ref:`modindex`

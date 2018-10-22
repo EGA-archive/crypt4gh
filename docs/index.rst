@@ -2,8 +2,8 @@
 LocalEGA GA4GH cryptor
 ======================
 
-`lega-cryptor` is a tool to encrypt, decrypt or re-encrypt files
-according to the  :download:`Crypt4GH file format
+`crypt4gh` is a tool to encrypt, decrypt or re-encrypt files
+according to the  :download:`GA4GH encryption file format
 <./static/crypt4gh.pdf>`.
 
 Demonstration
@@ -37,7 +37,7 @@ Table of Contents
 |Travis| | Version |version| | Generated |today|
 
 
-.. |Travis| image:: https://travis-ci.org/EGA-archive/LocalEGA-cryptor.svg?branch=master
+.. |Travis| image:: https://travis-ci.org/EGA-archive/crypt4gh.svg?branch=master
 	:alt: Build Status
 	:class: inline-baseline
 

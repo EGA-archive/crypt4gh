@@ -1,19 +1,19 @@
 
-`lega-cryptor` is a tool to encrypt, decrypt or re-encrypt files
+`crypt4gh` is a tool to encrypt, decrypt or re-encrypt files
 according to the [GA4GH cryptographic standard](https://github.com/daviesrob/hts-specs/tree/crypt4gh_improved).
 
 # Installation
 
 ```
-git clone https://github.com/ega-archive/LocalEGA-cryptor
-pip install -r LocalEGA-cryptor/requirements.txt
-pip install -e ./LocalEGA-cryptor
+git clone https://github.com/EGA-archive/crypt4gh
+pip install -r crypt4gh/requirements.txt
+pip install -e ./crypt4gh
 ```
 
 or
 
 ```
-pip install git+https://github.com/ega-archive/LocalEGA-cryptor.git
+pip install git+https://github.com/EGA-archive/crypt4gh.git
 ```
 
 # Usage
@@ -21,15 +21,15 @@ pip install git+https://github.com/ega-archive/LocalEGA-cryptor.git
 The usual `-h` flag shows you the different options that the tool accepts.
 
 ```bash
-$ lega-cryptor -h
-LocalEGA utilities for the cryptographic GA4GH standard.
+$ crypt4gh -h
+Utility for the cryptographic GA4GH standard.
 Reads from stdin and Outputs to stdout
 
 Usage:
-   lega-cryptor [-hv] [--log <file>] encrypt [--signing_key <file>] [--pk <path>]
-   lega-cryptor [-hv] [--log <file>] decrypt [--sk <path>]
-   lega-cryptor [-hv] [--log <file>] reencrypt [--signing_key <file>] [--sk <path>] [--pk <path>]
-   lega-cryptor [-hv] [--log <file>] generate [-f <path>] [-P <passphrase>] [--signing]
+   crypt4gh [-hv] [--log <file>] encrypt [--signing_key <file>] [--pk <path>]
+   crypt4gh [-hv] [--log <file>] decrypt [--sk <path>]
+   crypt4gh [-hv] [--log <file>] reencrypt [--signing_key <file>] [--sk <path>] [--pk <path>]
+   crypt4gh [-hv] [--log <file>] generate [-f <path>] [-P <passphrase>] [--signing]
 
 Options:
    -h, --help             Prints this help and exit
@@ -54,7 +54,7 @@ Environment variables:
 If you want to encrypt a file, say, for the Swedish Local EGA instance:
 
 ```bash
-$ lega-cryptor encrypt --pk path_to_pubkey < inputfile > outputfile
+$ crypt4gh encrypt --pk path_to_pubkey < inputfile > outputfile
 ```
 # File Format
 

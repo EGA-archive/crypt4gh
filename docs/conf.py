@@ -58,7 +58,7 @@ master_doc = 'index'
 current_year = str(datetime.date.today().year)
 
 # General information about the project.
-project = 'LocalEGA GA4GH cryptor'
+project = 'GA4GH cryptor'
 copyright = f'{current_year}, EGA System Developers'
 author = 'EGA System Developers'
 
@@ -94,7 +94,7 @@ autosummary_generate = True
 
 # -- Options for HTML output ----------------------------------------------
 
-html_title = 'NBIS LocalEGA GA4GH cryptor'
+html_title = 'GA4GH cryptor'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
@@ -104,7 +104,7 @@ html_title = 'NBIS LocalEGA GA4GH cryptor'
 #     'fixed_sidebar': True,
 #     'show_powered_by': False,
 #     #'badge_branch': 'dev',
-#     'github_repo': 'https://github.com/NBISweden/LocalEGA',
+#     'github_repo': 'https://github.com/EGA-archive/crypt4gh',
 #     'github_button': True,
 # }
 
@@ -144,8 +144,8 @@ def setup(app):
     app.add_stylesheet('custom.css')
 
 # -- Other stuff ----------------------------------------------------------
-htmlhelp_basename = 'LocalEGA-cryptor'
+htmlhelp_basename = 'crypt4gh'
 latex_elements = {}
-latex_documents = [ (master_doc, 'LocalEGA-cryptor.tex', 'Local EGA cryptor', 'NBIS System Developers', 'manual') ]
-man_pages = [ (master_doc, 'localega', 'Local EGA', [author], 1) ]
-texinfo_documents = [ (master_doc, 'LocalEGA-cryptor', 'Local EGA cryptor', author, 'LocalEGA cryptor', 'GA4GH cryptographic tools', 'Miscellaneous') ]
+latex_documents = [ (master_doc, 'crypt4gh.tex', 'GA4GH cryptor', 'EGA System Developers', 'manual') ]
+man_pages = [ (master_doc, 'crypt4gh', 'GA4GH cryptor', [author], 1) ]
+texinfo_documents = [ (master_doc, 'crypt4gh', 'GA4GH cryptor', author, 'GA4GH cryptor', 'GA4GH cryptographic tools', 'Miscellaneous') ]

@@ -1,5 +1,5 @@
 ======================
-LocalEGA GA4GH cryptor
+GA4GH cryptor
 ======================
 
 `crypt4gh` is a tool to encrypt, decrypt or re-encrypt files

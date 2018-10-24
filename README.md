@@ -51,11 +51,18 @@ Environment variables:
 
 # Examples
 
-If you want to encrypt a file, say, for the Swedish Local EGA instance:
+If you want to encrypt a file:
 
 ```bash
-$ crypt4gh encrypt --pk path_to_pubkey < inputfile > outputfile
+$ crypt4gh encrypt --pk path_to_pubkey < file > file.c4gh
 ```
+
+If you want to decrypt a file:
+
+```bash
+$ crypt4gh decrypt --sk path_to_seckey < file.c4gh > file
+```
+
 # File Format
 
 Refer to the [following slide](https://docs.google.com/presentation/d/1Jg0cUCLBO7ctyIWiyTmxb5Il_fQVzKzrxHHzR0K9ZvU/edit#slide=id.g3b7e5ab607_0_2?usp=sharing)

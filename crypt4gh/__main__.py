@@ -17,9 +17,9 @@ from .keys import generate_ec, generate_signing
 
 LOG = logging.getLogger(__name__)
 
-DEFAULT_PK   = os.getenv('LEGA_PUBLIC_KEY', None)
-DEFAULT_SK   = os.getenv('LEGA_SECRET_KEY', None)
-DEFAULT_SIGK = os.getenv('LEGA_SIGNING_KEY', None)
+DEFAULT_PK   = os.getenv('C4GH_PUBLIC_KEY', None)
+DEFAULT_SK   = os.getenv('C4GH_SECRET_KEY', None)
+DEFAULT_SIGK = os.getenv('C4GH_SIGNING_KEY', None)
 
 def run(args):
 

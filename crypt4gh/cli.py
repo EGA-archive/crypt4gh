@@ -10,7 +10,7 @@ from docopt import docopt
 from . import __title__, __version__
 
 PROG = 'lega-cryptor'
-DEFAULT_LOG = os.getenv('LEGA_LOG', None)
+DEFAULT_LOG = os.getenv('C4GH_LOG', None)
 
 __doc__ = f'''
 
@@ -30,15 +30,15 @@ Options:
    --pk <keyfile>         Public Curve25519 key to be used for encryption
    --sk <keyfile>         Private Curve25519 key to be used for decryption
    --signing_key <file>   Ed25519 Signing key for the header
-   -f <path>              Private Curve25519 key (.pub is appended for the Public one) [default: ~/.lega/ega.key]
+   -f <path>              Private Curve25519 key (.pub is appended for the Public one) [default: ~/.c4gh/key]
    -P <passphrase>        Passphrase to lock the secret key [default: None]
    --signing              Generate an ed25519 signing/verifying keypair
 
 Environment variables:
-   LEGA_LOG         If defined, it will be used as the default logger
-   LEGA_PUBLIC_KEY  If defined, it will be used as the default public key (ie --pk ${{LEGA_PUBLIC_KEY}})
-   LEGA_SECRET_KEY  If defined, it will be used as the default secret key (ie --sk ${{LEGA_SECRET_KEY}})
-   LEGA_SIGNING_KEY If defined, it will be used as the default signing key (ie --signing_key ${{LEGA_SIGNING_KEY}})
+   C4GH_LOG         If defined, it will be used as the default logger
+   C4GH_PUBLIC_KEY  If defined, it will be used as the default public key (ie --pk ${{C4GH_PUBLIC_KEY}})
+   C4GH_SECRET_KEY  If defined, it will be used as the default secret key (ie --sk ${{C4GH_SECRET_KEY}})
+   C4GH_SIGNING_KEY If defined, it will be used as the default signing key (ie --signing_key ${{C4GH_SIGNING_KEY}})
 
 '''
 

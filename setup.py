@@ -1,5 +1,6 @@
 from setuptools import setup
 from crypt4gh import __version__, __author__, __title__, __doc__ as lega_doc, __license__
+from crypt4gh.cli import PROG
 
 setup(name='crypt4gh',
       version=__version__,
@@ -15,7 +16,7 @@ setup(name='crypt4gh',
       zip_safe=False,
       entry_points={
           'console_scripts': [
-              'crypt4gh = crypt4gh.__main__:main',
+              f'{PROG} = crypt4gh.__main__:main',
           ]
       },
       platforms = 'any',

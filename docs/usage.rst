@@ -7,15 +7,15 @@ The usual ``-h`` flag shows you the different options that the tool accepts.
 
 .. code-block:: console
 
-    $ lega-cryptor -h
+    $ crypt4gh -h
     LocalEGA utilities for the cryptographic GA4GH standard.
     Reads from stdin and Outputs to stdout
 
     Usage:
-		lega-cryptor [-hv] [--log <file>] encrypt [--signing_key <file>] [--pk <path>]
-		lega-cryptor [-hv] [--log <file>] decrypt [--sk <path>]
-		lega-cryptor [-hv] [--log <file>] reencrypt [--signing_key <file>] [--sk <path>] [--pk <path>]
-		lega-cryptor [-hv] [--log <file>] generate [-f <path>] [-P <passphrase>] [--signing]
+		crypt4gh [-hv] [--log <file>] encrypt [--signing_key <file>] [--pk <path>]
+		crypt4gh [-hv] [--log <file>] decrypt [--sk <path>]
+		crypt4gh [-hv] [--log <file>] reencrypt [--signing_key <file>] [--sk <path>] [--pk <path>]
+		crypt4gh [-hv] [--log <file>] generate [-f <path>] [-P <passphrase>] [--signing]
 	
     Options:
 		-h, --help             Prints this help and exit
@@ -29,10 +29,10 @@ The usual ``-h`` flag shows you the different options that the tool accepts.
 		--signing              Generate an ed25519 signing/verifying keypair
 
     Environment variables:
-		LEGA_LOG         If defined, it will be used as the default logger
-		LEGA_PUBLIC_KEY  If defined, it will be used as the default public key (ie --pk ${LEGA_PUBLIC_KEY})
-		LEGA_SECRET_KEY  If defined, it will be used as the default secret key (ie --sk ${LEGA_SECRET_KEY})
-		LEGA_SIGNING_KEY If defined, it will be used as the default signing key (ie --signing_key ${LEGA_SIGNING_KEY})
+		C4GH_LOG         If defined, it will be used as the default logger
+		C4GH_PUBLIC_KEY  If defined, it will be used as the default public key (ie --pk ${C4GH_PUBLIC_KEY})
+		C4GH_SECRET_KEY  If defined, it will be used as the default secret key (ie --sk ${C4GH_SECRET_KEY})
+		C4GH_SIGNING_KEY If defined, it will be used as the default signing key (ie --signing_key ${C4GH_SIGNING_KEY})
 
 Examples
 --------

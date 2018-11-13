@@ -9,7 +9,7 @@ from docopt import docopt
 
 from . import __title__, __version__
 
-PROG = 'lega-cryptor'
+PROG = 'crypt4gh'
 DEFAULT_LOG = os.getenv('C4GH_LOG', None)
 
 __doc__ = f'''
@@ -21,18 +21,19 @@ Usage:
    {PROG} [-hv] [--log <file>] encrypt [--signing_key <file>] [--pk <path>]
    {PROG} [-hv] [--log <file>] decrypt [--sk <path>]
    {PROG} [-hv] [--log <file>] reencrypt [--signing_key <file>] [--sk <path>] [--pk <path>]
-   {PROG} [-hv] [--log <file>] generate [-f <path>] [-P <passphrase>] [--signing]
+   {PROG} [-hv] [--log <file>] generate [-o <path>] [-P <passphrase>] [--signing] [-f PKCS8|SSH2|none]
 
 Options:
    -h, --help             Prints this help and exit
    -v, --version          Prints the version and exits
    --log <file>           Path to the logger file (in YML format)
-   --pk <keyfile>         Public Curve25519 key to be used for encryption
-   --sk <keyfile>         Private Curve25519 key to be used for decryption
+   --pk <keyfile>         Public Curve25519 key to be used for encryption [default: ~/.c4gh/key.pub]
+   --sk <keyfile>         Private Curve25519 key to be used for decryption [default: ~/.c4gh/key]
    --signing_key <file>   Ed25519 Signing key for the header
-   -f <path>              Private Curve25519 key (.pub is appended for the Public one) [default: ~/.c4gh/key]
+   -o <path>              Private Curve25519 key (.pub is appended for the Public one) [default: ~/.c4gh/sign]
    -P <passphrase>        Passphrase to lock the secret key [default: None]
    --signing              Generate an ed25519 signing/verifying keypair
+   -f <fmt>               Key format: PKCS8, SSH2, or none [default: none]
 
 Environment variables:
    C4GH_LOG         If defined, it will be used as the default logger

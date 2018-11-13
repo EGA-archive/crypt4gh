@@ -8,8 +8,7 @@ import traceback
 
 import ed25519
 from nacl.public import PrivateKey, PublicKey
-from nacl.encoding import HexEncoder as KeyFormatter
-#from nacl.encoding import URLSafeBase64Encoder as KeyFormatter
+from nacl.encoding import HexEncoder
 
 from .crypt4gh import encrypt, decrypt, reencrypt
 from .cli import parse_args
@@ -34,13 +33,15 @@ def run(args):
         # If we want to sign the header
         signing_key = args['--signing_key'] or DEFAULT_SIGK
         if signing_key: # and os.path.exists(signing_key):
-            with open(signing_key, 'rb') as f:
-                signing_key = ed25519.SigningKey(f.read())
+            signing_key = os.path.expanduser(signing_key)
+            with open(signing_key, 'rt') as f: # hex format
+                signing_key = ed25519.SigningKey(bytes.fromhex(f.read()))
 
         pubkey = args['--pk'] or DEFAULT_PK
         if pubkey: # and os.path.exists(signing_key):
-            with open(pubkey, 'rb') as f:
-                pubkey = PublicKey(f.read(), KeyFormatter)
+            pubkey = os.path.expanduser(pubkey)
+            with open(pubkey, 'rt') as f: # hex format
+                pubkey = PublicKey(f.read(), HexEncoder)
             
         encrypt(sys.stdin.buffer, sys.stdout.buffer, pubkey, signing_key=signing_key)
     
@@ -50,10 +51,13 @@ def run(args):
     if args['decrypt']:
 
         seckey = args['--sk'] or DEFAULT_SK
-        if not seckey or not os.path.exists(seckey):
+        if not seckey:
+            raise ValueError('Secret key not specified')
+        seckey = os.path.expanduser(seckey)
+        if not os.path.exists(seckey):
             raise ValueError('Secret key not found')
-        with open(seckey, 'rb') as skfile:
-            seckey = PrivateKey(skfile.read(), KeyFormatter)
+        with open(seckey, 'rt') as skfile: # hex format
+            seckey = PrivateKey(skfile.read(), HexEncoder)
 
             # from getpass import getpass
             # passphrase = getpass(prompt=f'Passphrase for {args["--sk"]}: ')
@@ -74,18 +78,27 @@ def run(args):
 
         signing_key = args['--signing_key'] or DEFAULT_SIGK
         if signing_key: # and os.path.exists(signing_key):
-            with open(signing_key, 'rb') as f:
-                signing_key = ed25519.SigningKey(f.read())
+            signing_key = os.path.expanduser(signing_key)
+            with open(signing_key, 'rt') as f: # hex format
+                signing_key = ed25519.SigningKey(bytes.fromhex(f.read()))
 
-        pubkey = args['--pk'] or DEFAULT_PK
-        if not pubkey or not os.path.exists(pubkey):
+        pubkey = os.path.expanduser(args['--pk'] or DEFAULT_PK)
+        if not pubkey:
+            raise ValueError('Public key not specified')
+        pubkey = os.path.expanduser(pubkey)
+        if not os.path.exists(pubkey):
             raise ValueError('Public key not found')
+
         seckey = args['--sk'] or DEFAULT_SK
-        if not seckey or not os.path.exists(seckey):
+        if not seckey:
+            raise ValueError('Secret key not specified')
+        seckey = os.path.expanduser(seckey)
+        if not os.path.exists(seckey):
             raise ValueError('Secret key not found')
-        with open(seckey, 'rb') as skfile, open(pubkey, 'rb') as pkfile:
-            seckey = PrivateKey(skfile.read(), KeyFormatter)
-            pubkey = PublicKey(pkfile.read(), KeyFormatter)
+
+        with open(seckey, 'rt') as skfile, open(pubkey, 'rt') as pkfile:  # hex format
+            seckey = PrivateKey(skfile.read(), HexEncoder)
+            pubkey = PublicKey(pkfile.read(), HexEncoder)
             # Same thing, unlock the key
             reencrypt(pubkey, seckey, sys.stdin.buffer, signing_key=signing_key, process_output=sys.stdout.buffer.write)
 
@@ -94,21 +107,23 @@ def run(args):
     #####################################
     if args['generate']:
 
-        seckey = args['-f']
+        seckey = os.path.expanduser(args['-o'])
         if os.path.isfile(seckey):
-            yn = input(f'{seckey} already exists. Do you want to overwrite it? (y/n)')
+            yn = input(f'{seckey} already exists. Do you want to overwrite it? (y/n) ')
             if yn != 'y':
                 print('Ok. Fair enough. Exiting.')
                 #sys.exit(0)
                 return
 
-        pubkey = args['-f'] + '.pub'
+        pubkey = os.path.expanduser(args['-o'] + '.pub')
         passphrase = args['-P']
 
         if args['--signing']:
             generate_signing(seckey, pubkey, passphrase=passphrase)
+            print('Signing key created in',seckey, file=sys.stderr)
         else:
             generate_ec(seckey, pubkey, passphrase=passphrase)
+            print('EC key created in',seckey, file=sys.stderr)
 
 
 def main(args=sys.argv[1:]):

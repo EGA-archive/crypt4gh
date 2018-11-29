@@ -7,9 +7,8 @@ import logging.config
 
 from docopt import docopt
 
-from . import __title__, __version__
+from . import __title__, __version__, PROG
 
-PROG = 'crypt4gh'
 DEFAULT_LOG = os.getenv('C4GH_LOG', None)
 
 __doc__ = f'''

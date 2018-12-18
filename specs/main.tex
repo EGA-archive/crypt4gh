@@ -1,0 +1,40 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% GA4GH File Encryption Standard specification
+% When editing, please start all sentences on a new line; and try to avoid source lines longer than 120 characters.
+%
+\documentclass[10pt]{article}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\input{settings}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\title{GA4GH File Encryption Standard}
+\author{Robert Davis, EBI \and Alexander Senf, EBI \and Fr\'ed\'eric Haziza, CRG}
+\date{\today}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{document}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% -------------------------------------
+\maketitle
+\input{abstract}
+%% -------------------------------------
+\tableofcontents
+\newpage
+%% -------------------------------------
+\input{sections/introduction}
+\input{sections/overview}
+\input{sections/details}
+\input{sections/security}
+
+%% -------------------------------------
+\addcontentsline{toc}{section}{References}
+\nocite{*} % Remove this for your own citations
+\bibliographystyle{abstract} %plain, alpha, unsrt, abbrv ?
+\bibliography{references}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\end{document}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

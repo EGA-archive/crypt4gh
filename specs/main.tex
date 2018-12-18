@@ -11,7 +11,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \title{GA4GH File Encryption Standard}
 \author{Robert Davis, EBI \and Alexander Senf, EBI \and Fr\'ed\'eric Haziza, CRG}
-\date{\today}
+\date{\today~{\footnotesize Version: 0.4}}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{document}
@@ -22,6 +22,7 @@
 \input{abstract}
 %% -------------------------------------
 \tableofcontents
+\thispagestyle{empty}% No page number on first page
 \newpage
 %% -------------------------------------
 \input{sections/introduction}
@@ -31,8 +32,7 @@
 
 %% -------------------------------------
 \addcontentsline{toc}{section}{References}
-\nocite{*} % Remove this for your own citations
-\bibliographystyle{abstract} %plain, alpha, unsrt, abbrv ?
+\bibliographystyle{abstract} % plain, alpha, unsrt, abbrv ?
 \bibliography{references}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

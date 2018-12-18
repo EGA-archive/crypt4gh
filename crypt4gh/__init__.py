@@ -8,3 +8,5 @@ __version__ = VERSION = 1
 __author__ = 'Frédéric Haziza <frederic.haziza@crg.eu>'
 __license__ = 'Apache License 2.0'
 __copyright__ = __title__ + ' @ CRG'
+
+PROG = 'crypt4gh'

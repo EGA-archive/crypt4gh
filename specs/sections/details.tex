@@ -141,8 +141,8 @@ The \kw{signing\_key} is the byte representation of the public
 component.
 
 \kw{header\_len} is the length of the \emph{remainder} of the header,
-ie.\ the encrypted header, potentially counting the signature length
-(ie.\ 64).
+ie.\ the encrypted header, counting the signature length (ie.\ 64) if
+the signing key length was non-zero.
 %
 It is stored as a four-byte little-endian unsigned integer.
 

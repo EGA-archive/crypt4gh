@@ -179,7 +179,7 @@ The plaintext header has is encoded using the type
 
 \begin{verbatim}
 enum EncryptionMethod<le_uint32> {
-  chacha20_poly1305(ietf) = 0;
+  chacha20_ietf_poly1305 = 0;
 };
 
 enum ChecksumAlgorithm<le_uint32> {
@@ -194,7 +194,7 @@ struct EncryptionParameters {
 
   enum EncryptionMethod<le_uint32> method;
   select (method) {
-    case chacha20_poly1305(ietf):
+    case chacha20_ietf_poly1305:
       byte       key[32];
   };
 };
@@ -205,7 +205,7 @@ struct EncryptionParameters {
 
 \kw{key} is a secret encryption key.
 %
-In the case of \kw{chacha20\_poly1305(ietf)}, it is treated as a
+In the case of \kw{chacha20\_ietf\_poly1305}, it is treated as a
 concatenation of eight 32-bit little-endian integers.
 
 % ---------------

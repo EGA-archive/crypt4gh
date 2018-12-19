@@ -4,12 +4,12 @@ This format is designed to protect files at rest and in transport from
 accidental disclosure.
 %
 Using authenticated encryption in individual segments mirrors
-solutions like Transport Layer Security (TLS) as described in
-\cite{RFC5246} and prevent undetected modification of segments.
+solutions like Transport Layer Security (TLS) as described
+in~\cite{RFC5246} and prevents undetected modifications of segments.
 
 \subsection{Selection of Key and Nonce}
 The security of the format depends on attackers not being able to
-guess the encryption key (and to a lesser extent the nonce).
+guess the encryption key (and to a lesser extent the nonces).
 %
 The encryption key and nonce MUST be generated using a
 cryptographically-secure pseudo-random number generator.
@@ -23,13 +23,11 @@ This data must be used to decrypt the data, although it is not part of
 the encrypted file \cite{RFC8439}.
 
 \subsection{Message Forgery}
-Using Curve25519 requires public and private keys of sender and
-recipient to calculate the shared encryption key, authenticating the
-origin of the encrypted file.
+The encrypted header part is authenticated using the Ed25519 signature
+scheme.
 %
-Using ChaCha20-ietf-Poly1305 uses the Poly1305 algorithm over the
-encrypted data to authenticate the content of each segment of the
-encrypted ciphertext.
+Using ChaCha20-ietf-Poly1305, the Poly1305 algorithm produces an
+authentication tag for each encrypted segment.
 
 \subsection{No File Updates Permitted}
 Implementations MUST NOT update encrypted files.

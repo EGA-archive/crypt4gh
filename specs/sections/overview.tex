@@ -1,5 +1,5 @@
 \section{Encrypted Representation Overview}
-The encrypted file consists of four parts:
+The encrypted file consists of five parts:
 
 \begin{itemize}
 \item An unencrypted header, containing a magic number, a version
@@ -9,9 +9,8 @@ The encrypted file consists of four parts:
 \item An encrypted header, which is encrypted using an asymmetric
   encryption algorithm. 
   %
-  It lists the checksum algorithm used, checksum of the unencrypted
-  data (optional), the encryption algorithm used, and the encryption
-  key needed to decrypt the encrypted data section.
+  It lists the checksum algorithm used, the encryption algorithm used,
+  and the encryption key needed to decrypt the encrypted data section.
   %
 \item A 64-byte Ed25519 signature validating the encrypted header.
   %
@@ -24,4 +23,7 @@ The encrypted file consists of four parts:
   %
   The data is encrypted in 64 kilobytes segments. For each encrypted
   segment, a 12 bytes nonce is prepended and a 16 bytes MAC is appended.
+  %
+\item The checksum of the unencrypted data, if the checksum algorithm
+  was listed in the encrypted header.
 \end{itemize}

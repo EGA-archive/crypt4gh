@@ -2,28 +2,19 @@
 The encrypted file consists of five parts:
 
 \begin{itemize}
-\item An unencrypted header, containing a magic number, a version
-  number, a public key along with its length (potentially zero), and
-  the length of the encrypted header.
-  %
-\item An encrypted header, which is encrypted using an asymmetric
-  encryption algorithm. 
-  %
-  It lists the checksum algorithm used, the encryption algorithm used,
-  and the encryption key needed to decrypt the encrypted data portion.
-  %
-\item A 64-byte Ed25519 signature validating the encrypted header.
-  %
+\item An unencrypted header, containing a magic number, a version number, an optional public key along with its length (potentially zero), and the length of the encrypted header.
+%
+\item An encrypted header, which is encrypted for individual recipients using an asymmetric key scheme. 
+%
+It lists the checksum algorithm used, the encryption algorithm used, and the encryption key needed to decrypt the encrypted data portion.
+%
 \item The encrypted data.
-  % 
-  This is the actual application data.
-  %
-  It is encrypted using a symmetric encryption algorithm, as specified
-  in the encrypted header.
-  %
-  The data is encrypted in 64 kilobytes segments. For each encrypted
-  segment, a 12 bytes nonce is prepended and a 16 bytes MAC is appended.
-  %
-\item The checksum of the unencrypted data, if the checksum algorithm
-  was listed in the encrypted header.
+% 
+This is the actual application data.
+%
+It is encrypted using a symmetric encryption algorithm, as specified in the encrypted header.
+%
+The data is encrypted in 64 kilobytes segments. For each encrypted segment, a 12 byte nonce is prepended and a 16 byte MAC is appended.
+%
+\item The checksum of the unencrypted data. If a checksum algorithm other than 'none' was listed in the encrypted header, the hexadecimal representation of the checksum over the unencrypted data is appended to the (unencrypted) data.
 \end{itemize}

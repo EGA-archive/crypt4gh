@@ -1,33 +1,26 @@
 \section{Security Considerations}
 \subsection{Threat Model}
-This format is designed to protect files at rest and in transport from
-accidental disclosure.
+This format is designed to protect files at rest and in transport from accidental disclosure.
 %
-Using authenticated encryption in individual segments mirrors
-solutions like Transport Layer Security (TLS) as described
-in~\cite{RFC5246} and prevents undetected modifications of segments.
+Using authenticated encryption in individual segments mirrors solutions like Transport Layer Security (TLS) as described in~\cite{RFC5246} and prevents undetected modifications of segments.
 
 \subsection{Selection of Key and Nonce}
-The security of the format depends on attackers not being able to
-guess the encryption key (and to a lesser extent the nonces).
+The security of the format depends on attackers not being able to guess the encryption key (and to a lesser extent the nonces).
 %
-The encryption key and nonce MUST be generated using a
-cryptographically-secure pseudo-random number generator.
+The encryption key and nonce SHOULD be generated using a cryptographically-secure pseudo-random number generator and MUST NOT be repeated with the same encryption key.
 %
 This makes the chance of guessing a key vanishingly small.
 %
-Additional security can be provided by using `Associated Data' when
-encrypting a file.
+Additional security can be provided by using `Associated Data' when encrypting a file.
 %
-This data must be used to decrypt the data, although it is not part of
-the encrypted file \cite{RFC8439}.
+This data must be used to decrypt the data, although it is not part of the encrypted file \cite{RFC8439}
 
 \subsection{Message Forgery}
-The encrypted header part is authenticated using the Ed25519 signature
-scheme.
+The encrypter's public key component is required to calculate the encryption key used for the header in the Curve25519 function. 
+If this public key is not specified in the header directly, it must be obtained from the encrypter, and can then be used to validate the origin of the file.
+The encrypted header part is authenticated using the Poly1305 algorithm over the header data.
 %
-Using ChaCha20-ietf-Poly1305, the Poly1305 algorithm produces an
-authentication tag for each encrypted segment.
+Using ChaCha20-ietf-Poly1305, the Poly1305 algorithm produces an authentication tag for each encrypted segment of the encryoted data.
 
 \subsection{No File Updates Permitted}
 Implementations MUST NOT update encrypted files.

@@ -1,55 +1,41 @@
 \section{Introduction}
 \subsection{Purpose}
-By its nature, genomic data can include information of a confidential
-nature about the health of individuals.
+By its nature, genomic data can include information of a confidential nature about the health of individuals.
 %
 It is important that such information is not accidentally disclosed.
 %
-One part of the defence against such disclosure is to, as much as
-possible, keep the data in an encrypted format.
+One part of the defence against such disclosure is to, as much as possible, keep the data in an encrypted format.
 %
 
-This document describes a file format that can be used to store data
-in an encrypted and authenticated state.
+This document describes a file format that can be used to store data in an encrypted and authenticated state.
 %
-Existing applications can, with minimal modification, read and write
-data in the encrypted format.
+Existing applications can, with minimal modification, read and write data in the encrypted format.
 %
-The choice of encryption also allows the encrypted data to be read
-starting from any location, facilitating indexed access to files.
+The choice of encryption also allows the encrypted data to be read starting from any location, facilitating indexed access to files.
 
 \subsection{Requirements}
-The keywords ``MUST'', ``MUST NOT'', ``REQUIRED'', ``SHALL'', ``SHALL
-NOT'', ``SHOULD'', ``SHOULD NOT'', ``RECOMMENDED'', ``MAY'', and
-``OPTIONAL'' in this document are to be interpreted as described
-in~\cite{RFC2119}.
+The keywords ``MUST'', ``MUST NOT'', ``REQUIRED'', ``SHALL'', ``SHALL NOT'', ``SHOULD'', ``SHOULD NOT'', ``RECOMMENDED'', ``MAY'', and ``OPTIONAL'' in this document are to be interpreted as described in~\cite{RFC2119}.
 
 \subsection{Terminology}
 %
 \begin{description}
 \item[Elliptic-curve cryptography (ECC)] %
-  An approach to public-key cryptography based on the algebraic
-  structure of elliptic curves over finite fields.
+  An approach to public-key cryptography based on the algebraic structure of elliptic curves over finite fields.
   % 
 \item[Curve25519] %
-  A widely used FIPS-140 approved ECC algorithm not encumbered by any
-  patents~\cite{RFC7748}.
+  A widely used FIPS-140 approved ECC algorithm not encumbered by any patents~\cite{RFC7748}.
   % 
 \item[Ed25519] %
-  An Edwards-curve Digital Signature Algorithm (EdDSA) over
-  Curve25519~\cite{RFC8032}.
+  An Edwards-curve Digital Signature Algorithm (EdDSA) over Curve25519~\cite{RFC8032}.
   % 
 \item[ChaCha20-IETF-Poly1305] %
-  ChaCha20 is a symmetric stream cipher built on a pseudo-random
-  function that gives the advantage that one can efficiently seek to
-  any position in the key stream in constant time.
+  ChaCha20 is a symmetric stream cipher built on a pseudo-random function that gives the advantage that one can efficiently seek to any position in the key stream in constant time.
   % 
   It is not patented.
   % 
   Poly1305 is a cryptographic message authentication code (MAC).
   % 
-  It can be used to verify the data integrity and the authenticity of
-  a message~\cite{RFC8439}.
+  It can be used to verify the data integrity and the authenticity of a message~\cite{RFC8439}.
   % 
 \item[ciphertext] %
   The encrypted version of the data.

@@ -2,15 +2,11 @@
 The encrypted file consists of five parts:
 
 \begin{itemize}
-\item An unencrypted header, containing a magic number, a version
-  number, a public key along with its length (potentially zero), and
-  the length of the encrypted header.
+\item An unencrypted header, containing a magic number, a version number, a public key along with its length (potentially zero), and the length of the encrypted header.
   %
-\item An encrypted header, which is encrypted using an asymmetric
-  encryption algorithm. 
+\item An encrypted header, which is encrypted using an asymmetric encryption algorithm. 
   %
-  It lists the checksum algorithm used, the encryption algorithm used,
-  and the encryption key needed to decrypt the encrypted data portion.
+  It lists the checksum algorithm used, the encryption algorithm used, and the encryption key needed to decrypt the encrypted data portion.
   %
 \item A 64-byte Ed25519 signature validating the encrypted header.
   %
@@ -18,12 +14,10 @@ The encrypted file consists of five parts:
   % 
   This is the actual application data.
   %
-  It is encrypted using a symmetric encryption algorithm, as specified
-  in the encrypted header.
+  It is encrypted using a symmetric encryption algorithm, as specified in the encrypted header.
   %
-  The data is encrypted in 64 kilobytes segments. For each encrypted
-  segment, a 12 bytes nonce is prepended and a 16 bytes MAC is appended.
+  The data is encrypted in 64 kilobytes segments. For each encrypted segment, a 12 bytes nonce is prepended and a 16 bytes MAC is appended.
   %
-\item The checksum of the unencrypted data, if the checksum algorithm
-  was listed in the encrypted header.
+\item The checksum of the unencrypted data, if the checksum algorithm was listed in the encrypted header.
+  %
 \end{itemize}

@@ -17,28 +17,27 @@ LocalEGA utilities for the cryptographic GA4GH standard.
 Reads from stdin and Outputs to stdout
 
 Usage:
-   {PROG} [-hv] [--log <file>] encrypt [--signing_key <file>] [--pk <path>]
-   {PROG} [-hv] [--log <file>] decrypt [--sk <path>]
-   {PROG} [-hv] [--log <file>] reencrypt [--signing_key <file>] [--sk <path>] [--pk <path>]
-   {PROG} [-hv] [--log <file>] generate [-o <path>] [-P <passphrase>] [--signing] [-f PKCS8|SSH2|none]
+   {PROG} [-hv] [--log <file>] encrypt [--sk <path>] [--pk <path>] --ppk <path>
+   {PROG} [-hv] [--log <file>] decrypt [--sign] [--pk <path>] [--sk <path>]
+   {PROG} [-hv] [--log <file>] reencrypt [--sign] [--sk <path>] [--ppk <path>] [--recipient_pk <path>]
+   {PROG} [-hv] [--log <file>] generate --pk <path> --sk <path> [-P <passphrase>] [-f PKCS8|PEM|SSH2|none]
 
 Options:
    -h, --help             Prints this help and exit
    -v, --version          Prints the version and exits
    --log <file>           Path to the logger file (in YML format)
-   --pk <keyfile>         Public Curve25519 key to be used for encryption [default: ~/.c4gh/key.pub]
+   --pk <keyfile>         Public Curve25519 key used for signing [default: ~/.c4gh/key.pub]
+   --ppk <keyfile>        Peer's Public Curve25519 key to be used for encryption
    --sk <keyfile>         Private Curve25519 key to be used for decryption [default: ~/.c4gh/key]
-   --signing_key <file>   Ed25519 Signing key for the header
-   -o <path>              Private Curve25519 key (.pub is appended for the Public one) [default: ~/.c4gh/sign]
+   --recipient_pk <file>  Recipient's public key
+   --sign                 Whether the sender should be authenticated
    -P <passphrase>        Passphrase to lock the secret key [default: None]
-   --signing              Generate an ed25519 signing/verifying keypair
    -f <fmt>               Key format: PKCS8, SSH2, or none [default: none]
 
 Environment variables:
    C4GH_LOG         If defined, it will be used as the default logger
    C4GH_PUBLIC_KEY  If defined, it will be used as the default public key (ie --pk ${{C4GH_PUBLIC_KEY}})
    C4GH_SECRET_KEY  If defined, it will be used as the default secret key (ie --sk ${{C4GH_SECRET_KEY}})
-   C4GH_SIGNING_KEY If defined, it will be used as the default signing key (ie --signing_key ${{C4GH_SIGNING_KEY}})
 
 '''
 

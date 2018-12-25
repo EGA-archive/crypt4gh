@@ -1,23 +1,21 @@
 \section{Encrypted Representation Overview}
-The encrypted file consists of five parts:
+The encrypted file consists of two parts: the header and the encrypted data portion.
 
+The header lists:
 \begin{itemize}
-\item An unencrypted header, containing a magic number, a version number, a public key along with its length (potentially zero), and the length of the encrypted header.
-  %
-\item An encrypted header, which is encrypted using an asymmetric encryption algorithm. 
-  %
-  It lists the checksum algorithm used, the encryption algorithm used, and the encryption key needed to decrypt the encrypted data portion.
-  %
-\item A 64-byte Ed25519 signature validating the encrypted header.
-  %
-\item The encrypted data.
-  % 
-  This is the actual application data.
-  %
-  It is encrypted using a symmetric encryption algorithm, as specified in the encrypted header.
-  %
-  The data is encrypted in 64 kilobytes segments. For each encrypted segment, a 12 bytes nonce is prepended and a 16 bytes MAC is appended.
-  %
-\item The checksum of the unencrypted data, if the checksum algorithm was listed in the encrypted header.
-  %
+\item a magic number, a version number, the length of the remainder of the header data.
+\item the header encryption method
+\item the encrypter's public key
+\item the checksum algorithm
+\item the encryption algorithm, and
+\item the encryption key needed to decrypt the encrypted data portion.
 \end{itemize}
+
+The encrypted data portion is the actual application data.
+% 
+It is encrypted using a symmetric encryption algorithm, as specified in the header.
+% 
+The data is encrypted in 64 kilobytes segments. For each encrypted segment, a 12 bytes nonce is prepended and a 16 bytes MAC is appended.
+% 
+The encrypted data portion may include a checksum of the unencrypted data, if the checksum algorithm is listed in the encrypted header.
+

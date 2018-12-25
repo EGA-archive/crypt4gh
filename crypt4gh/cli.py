@@ -17,22 +17,25 @@ LocalEGA utilities for the cryptographic GA4GH standard.
 Reads from stdin and Outputs to stdout
 
 Usage:
-   {PROG} [-hv] [--log <file>] encrypt [--sk <path>] [--pk <path>] --ppk <path>
-   {PROG} [-hv] [--log <file>] decrypt [--sign] [--pk <path>] [--sk <path>]
-   {PROG} [-hv] [--log <file>] reencrypt [--sign] [--sk <path>] [--ppk <path>] [--recipient_pk <path>]
-   {PROG} [-hv] [--log <file>] generate --pk <path> --sk <path> [-P <passphrase>] [-f PKCS8|PEM|SSH2|none]
+   {PROG} [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path>
+   {PROG} [-hv] [--log <file>] decrypt [--sender_pk <path>] [--sk <path>]
+   {PROG} [-hv] [--log <file>] reencrypt [--sender_public_key <path>] [--sk <path>] --recipient_pk <path>
+   {PROG} [-hv] [--log <file>] generate [-f] [--pk <path>] [--sk <path>] [--nocrypt] [-C <comment>] [-R <rounds>]
 
 Options:
    -h, --help             Prints this help and exit
    -v, --version          Prints the version and exits
    --log <file>           Path to the logger file (in YML format)
    --pk <keyfile>         Public Curve25519 key used for signing [default: ~/.c4gh/key.pub]
-   --ppk <keyfile>        Peer's Public Curve25519 key to be used for encryption
    --sk <keyfile>         Private Curve25519 key to be used for decryption [default: ~/.c4gh/key]
-   --recipient_pk <file>  Recipient's public key
+   --recipient_pk <path>  Recipient's public key
+   --sender_pk <path>     Peer's Public Curve25519 key to verify provenance (aka, signature)
    --sign                 Whether the sender should be authenticated
-   -P <passphrase>        Passphrase to lock the secret key [default: None]
-   -f <fmt>               Key format: PKCS8, SSH2, or none [default: none]
+   -C <comment>           Key Comment
+   --nocrypt              Do not encrypt the private key.
+                          Otherwise it is encrypted in the Crypt4GH key format
+   -R <rounds>            Numbers of rounds for the key derivation. Ignore it to use the defaults.
+   -f                     Overwrite the destination files
 
 Environment variables:
    C4GH_LOG         If defined, it will be used as the default logger

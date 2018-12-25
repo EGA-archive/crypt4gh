@@ -4,15 +4,13 @@
 import sys
 import os
 import logging
-import traceback
+#import traceback
+from functools import partial
+from getpass import getpass
 
-import ed25519
-from nacl.public import PrivateKey, PublicKey
-from nacl.encoding import Base64Encoder
-
-from .crypt4gh import encrypt, decrypt, reencrypt
+from .engine import encrypt, decrypt, reencrypt
 from .cli import parse_args
-from .keys import generate_ec, read as read_key
+from .keys import generate_ec, get_public_key, get_private_key
 
 LOG = logging.getLogger(__name__)
 
@@ -29,21 +27,21 @@ def run(args):
     ##################################### 
     if args['encrypt']:
 
-        pubkey = args['--pk'] or DEFAULT_PK
         seckey = args['--sk'] or DEFAULT_SK
-        peer_pubkey = args['--ppk']
-        if not pubkey or not seckey or not peer_pubkey:
-            raise ValueError('CLI')
-        
-        pubkey = os.path.expanduser(pubkey)
+        if not seckey:
+            raise ValueError('Secret key not specified')
         seckey = os.path.expanduser(seckey)
-        peer_pubkey = os.path.expanduser(peer_pubkey)
+        if not os.path.exists(seckey):
+            raise ValueError('Secret key not found')
+        cb = partial(getpass, prompt='Passphrase for {}: '.format(os.path.basename(args["--sk"])))
+        seckey = get_private_key(seckey, cb)
 
-        pubkey = read_key(pubkey)
-        seckey = read_key(seckey)
-        peer_pubkey = read_key(peer_pubkey)
+        recipient_pubkey = os.path.expanduser(args['--recipient_pk'])
+        if not os.path.exists(recipient_pubkey):
+            raise ValueError("Recipient's Public Key not found")
+        recipient_pubkey = get_public_key(recipient_pubkey)
             
-        encrypt(pubkey, seckey, peer_pubkey, sys.stdin.buffer, sys.stdout.buffer)
+        encrypt(seckey, recipient_pubkey, sys.stdin.buffer, sys.stdout.buffer)
     
     #####################################
     ## For Decryption
@@ -53,39 +51,20 @@ def run(args):
         seckey = args['--sk'] or DEFAULT_SK
         if not seckey:
             raise ValueError('Secret key not specified')
-
         seckey = os.path.expanduser(seckey)
+        if not os.path.exists(seckey):
+            raise ValueError('Secret key not found')
+        cb = partial(getpass, prompt='Passphrase for {}: '.format(os.path.basename(args["--sk"])))
+        seckey = get_private_key(seckey, cb)
 
-        seckey = read_key(seckey)
-        # from getpass import getpass
-        # passphrase = getpass(prompt=f'Passphrase for {args["--sk"]}: ')
-            
-        # hashlib.pbkdf2_hmac('sha256', passphrase.encode(), os.random(16), 100000, dklen=32)
+        sender_pubkey = get_public_key(os.path.expanduser(args['--sender_pk'])) if args['--sender_pk'] else None
 
-        # hmac.digest(key, encrypted_seckey, digest=hashlib.sha256)
-        # md = hmac.new(passphrase, encrypted_seckey)
-        # passphrase = hmac.new(passphrase, seckey)
-        # seckey = unlock(seckey, passphrase)
-
-        decrypt(seckey, sys.stdin.buffer, sys.stdout.buffer)
+        decrypt(seckey, sys.stdin.buffer, sys.stdout.buffer, sender_pubkey=sender_pubkey)
 
     #####################################
     ## For ReEncryption
     #####################################
     if args['reencrypt']:
-
-        signing_key = args['--signing_key'] or DEFAULT_SIGK
-        if signing_key: # and os.path.exists(signing_key):
-            signing_key = os.path.expanduser(signing_key)
-            with open(signing_key, 'rt') as f: # hex format
-                signing_key = ed25519.SigningKey(bytes.fromhex(f.read()))
-
-        pubkey = os.path.expanduser(args['--pk'] or DEFAULT_PK)
-        if not pubkey:
-            raise ValueError('Public key not specified')
-        pubkey = os.path.expanduser(pubkey)
-        if not os.path.exists(pubkey):
-            raise ValueError('Public key not found')
 
         seckey = args['--sk'] or DEFAULT_SK
         if not seckey:
@@ -93,12 +72,13 @@ def run(args):
         seckey = os.path.expanduser(seckey)
         if not os.path.exists(seckey):
             raise ValueError('Secret key not found')
+        cb = partial(getpass, prompt='Passphrase for {}: '.format(os.path.basename(args["--sk"])))
+        seckey = get_private_key(seckey, cb)
 
-        with open(seckey, 'rt') as skfile, open(pubkey, 'rt') as pkfile:  # hex format
-            seckey = PrivateKey(skfile.read(), HexEncoder)
-            pubkey = PublicKey(pkfile.read(), HexEncoder)
-            # Same thing, unlock the key
-            reencrypt(pubkey, seckey, sys.stdin.buffer, signing_key=signing_key, process_output=sys.stdout.buffer.write)
+        recipient_pubkey = get_public_key(os.path.expanduser(args['--recipient_pk']))
+        sender_pubkey = get_public_key(os.path.expanduser(args['--sender_pk'])) if args['--sender_pk'] else None
+
+        reencrypt(seckey, recipient_pubkey, sys.stdin.buffer, sender_pubkey=sender_pubkey, process_output=sys.stdout.buffer.write)
 
     #####################################
     ## For Keys Generation
@@ -107,16 +87,20 @@ def run(args):
 
         pubkey = os.path.expanduser(args['--pk'])
         seckey = os.path.expanduser(args['--sk'])
-        for k in (pubkey, seckey):
-            if os.path.isfile(k):
-                yn = input(f'{k} already exists. Do you want to overwrite it? (y/n) ')
-                if yn != 'y':
-                    print('Ok. Fair enough. Exiting.')
-                    #sys.exit(0)
-                    return
-
-        passphrase = args['-P']
-        generate_ec(seckey, pubkey, passphrase=passphrase)
+        if not args['-f']: # Don't force
+            for k in (pubkey, seckey):
+                if os.path.isfile(k):
+                    yn = input(f'{k} already exists. Do you want to overwrite it? (y/n) ')
+                    if yn != 'y':
+                        print('Ok. Fair enough. Exiting.')
+                        #sys.exit(0)
+                        return
+                
+        do_crypt = not args['--nocrypt']
+        cb = partial(getpass, prompt=f'Passphrase for {args["--sk"]}: ') if do_crypt else None
+        rounds = int(args['-R']) if args['-R'] else None
+        comment = args['-C'].encode() if args['-C'] else None
+        generate_ec(seckey, pubkey, callback=cb, comment=comment, rounds=rounds)
 
 
 def main(args=sys.argv[1:]):

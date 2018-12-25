@@ -62,7 +62,7 @@ def raise_if_not_supported_method(method):
 ##############################################################
 
 def _encrypt_segment(data, outfile, session_key):
-    LOG.debug("Segment: %s..%s", data[:30], data[-30:])
+    #LOG.debug("Segment: %s..%s", data[:30], data[-30:])
 
     cipher = ChaCha20Poly1305(session_key)
     nonce = os.urandom(12)
@@ -70,13 +70,13 @@ def _encrypt_segment(data, outfile, session_key):
     outfile.write(nonce)
     outfile.write(encrypted_data)
 
-def encrypt(pubkey, seckey, peer_pubkey, infile, outfile, checksum_algorithm=DEFAULT_CHECKSUM_ALGORITHM):
+def encrypt(seckey, recipient_pubkey, infile, outfile, checksum_algorithm=DEFAULT_CHECKSUM_ALGORITHM):
 
     LOG.info('Encrypting the file')
     session_key = os.urandom(32)
 
     LOG.debug('Creating Crypt4GH header')
-    header_bytes = header_encrypt(session_key, pubkey, seckey, peer_pubkey)
+    header_bytes = header_encrypt(session_key, seckey, recipient_pubkey)
     outfile.write(header_bytes)
 
     LOG.debug("Preparing the checksum")
@@ -96,11 +96,11 @@ def encrypt(pubkey, seckey, peer_pubkey, infile, outfile, checksum_algorithm=DEF
 
     # We reached the last segment
     data = bytes(segment[:segment_len]) # to discard the bytes from the previous segments
-    LOG.info('Last block: %s', data[:30])
+    #LOG.info('Last block: %s', data[:30])
     if md:
         md.update(data)
         digest = md.digest()
-        LOG.debug('Digest: %s [%d]', digest.hex(), len(digest))
+        LOG.debug('Digest: %s [%d]', digest.hex().upper(), len(digest))
         data += digest
 
     # Need to cut into 2 segments?
@@ -178,31 +178,33 @@ def body_decrypt(infile, checksum_algorithm, method, session_key, process_output
     if md:
         digest = buf[-md.digest_size:]
         if not compare_digest(digest, md.digest()):
-            LOG.debug(f'Computed MDC: {md.hexdigest().upper()}')
-            LOG.debug(f'Original MDC: {digest.hex().upper()}')
+            LOG.debug('Computed MDC: %s', md.hexdigest().upper())
+            LOG.debug('Original MDC: %s', digest.hex().upper())
             raise ValueError('Invalid checksum')
+        else:
+            LOG.debug('Digest: %s [%d]', digest.hex().upper(), len(digest))
 
     LOG.info('Decryption Successful')
 
     
-def decrypt(seckey, infile, outfile, peer_pubkey=None):
+def decrypt(seckey, infile, outfile, sender_pubkey=None):
     LOG.info('Decrypting file')
-    encrypted_part = header_parse(infile)
+    header_data = header_parse(infile)
     #LOG.debug('Header is the header\n %s', header)
-    checksum_algorithm, method, session_key = header_decrypt(encrypted_part, seckey, peer_pubkey=peer_pubkey)
+    checksum_algorithm, method, session_key = header_decrypt(header_data, seckey, sender_pubkey=sender_pubkey)
     # Decrypt the rest
     return body_decrypt(infile, checksum_algorithm, method, session_key, process_output=outfile.write)
 
 
-def reencrypt(pubkey, privkey, infile, peer_pubkey=None, process_output=lambda _:None, chunk_size=4096):
+def reencrypt(seckey, recipient_pubkey, infile, sender_pubkey=None, process_output=lambda _:None, chunk_size=4096):
     '''Extract header and update with another one.
     The data section is only copied'''
 
     assert( callable(process_output) )
 
-    encrypted_header = Header.from_stream(infile)
-    header = encrypted_header.reencrypt(pubkey, privkey, peer_pubkey=peer_pubkey)
-    process_output(bytes(header))
+    header_data = header_parse(infile)
+    header = header_reencrypt(header_data, seckey, recipient_pubkey, sender_pubkey=None)
+    process_output(header)
 
     LOG.info(f'Streaming the remainer of the file')
     while True:

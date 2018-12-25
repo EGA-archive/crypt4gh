@@ -13,6 +13,7 @@ from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 from nacl.bindings import crypto_box_beforenm as derive_shared_key
 
 from . import __version__
+from .keys import retrieve_pubkey
 
 LOG = logging.getLogger(__name__)
 
@@ -63,21 +64,24 @@ def parse(stream):
 # else: NotImplemented / NotSupported
 
 
-def encrypt_X25519_Chacha20_Poly1305(algorithm_data, pubkey, seckey, peer_pubkey, encryption_method=0, checksum_algorithm=2):
+def encrypt_X25519_Chacha20_Poly1305(algorithm_data, seckey, recipient_pubkey, encryption_method=0, checksum_algorithm=2):
     '''Computes the encrypted part'''
     data = (checksum_algorithm.to_bytes(4, 'little') +  # 4 byte
             encryption_method.to_bytes(4,'little')   +  # 4 bytes
             algorithm_data)                             # See method data size
+
+    pubkey = bytes(retrieve_pubkey(seckey))
+
     #LOG.debug('Original data: %s', data.hex())
-    LOG.debug("    Session Key: %s", algorithm_data.hex())
-    LOG.debug('  my public key: %s', pubkey.hex())
-    LOG.debug('  my secret key: %s', seckey.hex())
-    LOG.debug('peer public key: %s', peer_pubkey.hex())
+    LOG.debug("         Session Key: %s", algorithm_data.hex())
+    LOG.debug('       my public key: %s', pubkey.hex())
+    LOG.debug('       my secret key: %s', seckey.hex())
+    LOG.debug('recipient public key: %s', recipient_pubkey.hex())
 
     header_encryption_method = 0
 
     # X25519 shared key
-    shared_key = derive_shared_key(peer_pubkey, seckey)
+    shared_key = derive_shared_key(recipient_pubkey, seckey)
     LOG.debug('shared key: %s', shared_key.hex())
 
     # Chacha20_Poly1305
@@ -90,13 +94,12 @@ def encrypt_X25519_Chacha20_Poly1305(algorithm_data, pubkey, seckey, peer_pubkey
     
     return serialize(header_data)
 
-def encrypt(algorithm_data, pubkey, seckey, peer_pubkey, encryption_method=0, checksum_algorithm=2, header_encryption_method=0):
+def encrypt(algorithm_data, seckey, recipient_pubkey, encryption_method=0, checksum_algorithm=2, header_encryption_method=0):
     '''Computes the encrypted part'''
     if header_encryption_method == 0:
         return encrypt_X25519_Chacha20_Poly1305(algorithm_data,
-                                                pubkey,
                                                 seckey,
-                                                peer_pubkey,
+                                                recipient_pubkey,
                                                 encryption_method=encryption_method,
                                                 checksum_algorithm=checksum_algorithm)
     if method == 1:
@@ -104,22 +107,21 @@ def encrypt(algorithm_data, pubkey, seckey, peer_pubkey, encryption_method=0, ch
     raise ValueError('Unsupported Header Encryption Method')
 
 
-def decrypt_X25519_Chacha20_Poly1305(encrypted_part, privkey, peer_pubkey=None):
-    #LOG.debug('Encrypted data: %s', encrypted_part.hex())
-    LOG.debug('  my secret key: %s', privkey.hex())
-    LOG.debug('peer public key: %s', peer_pubkey.hex() if peer_pubkey else None)
+def decrypt_X25519_Chacha20_Poly1305(encrypted_part, privkey, sender_pubkey=None):
+    #LOG.debug('  Encrypted data: %s', encrypted_part.hex())
+    LOG.debug('    my secret key: %s', privkey.hex())
+    LOG.debug('Sender public key: %s', sender_pubkey.hex() if sender_pubkey else None)
 
-    if peer_pubkey and peer_pubkey != encrypted_part[:32]:
+    peer_pubkey = encrypted_part[:32]
+    if sender_pubkey and sender_pubkey != peer_pubkey:
         raise ValueError("Invalid Peer's Public Key")
-    else:
-        peer_pubkey = encrypted_part[:32]
 
     nonce = encrypted_part[32:44]
     algorithm_data = encrypted_part[44:]
 
-    LOG.debug('peer pubkey: %s', peer_pubkey.hex())
-    LOG.debug('      nonce: %s', nonce.hex())
-    LOG.debug('   enc data: %s', algorithm_data.hex())
+    LOG.debug('   peer pubkey: %s', peer_pubkey.hex())
+    LOG.debug('         nonce: %s', nonce.hex())
+    LOG.debug('encrypted data: %s', algorithm_data.hex())
 
     if len(algorithm_data) != 56: # 4+4+32 + tag
         raise ValueError('Invalid encrypted data length')
@@ -140,17 +142,18 @@ def decrypt_X25519_Chacha20_Poly1305(encrypted_part, privkey, peer_pubkey=None):
 
     return (checksum_algorithm, method, data[8:])
 
-def decrypt(data, privkey, peer_pubkey=None):
-    header_encryption_method = int.from_bytes(bytes(data[:4]), byteorder='little')
+def decrypt(data, privkey, sender_pubkey=None):
+    header_encryption_method = int.from_bytes(data[:4], byteorder='little')
+    LOG.debug('Header Encryption Method: %d', header_encryption_method)
     if header_encryption_method == 0:
-        return decrypt_X25519_Chacha20_Poly1305(data[4:], privkey, peer_pubkey=peer_pubkey)
-    if method == 1:
+        return decrypt_X25519_Chacha20_Poly1305(data[4:], privkey, sender_pubkey=sender_pubkey)
+    if header_encryption_method == 1:
         raise NotImplementedError('AES-256-GCM support is not implemented')
-    raise ValueError('Unsupported Header Encryption Method')
+    raise ValueError(f'Unsupported Header Encryption Method: {header_encryption_method}')
 
-def reencrypt(encrypted_part, privkey, recipient_pubkey, peer_pubkey=None):
+def reencrypt(encrypted_part, privkey, recipient_pubkey, sender_pubkey=None):
     '''Re-encrypt the given header'''
-    LOG.info(f'Reencrypt the header')
-    checksum_algorithm, method, algorithm_data = decrypt(encrypted_part, peer_pubkey=peer_pubkey)
+    LOG.info(f'Reencrypting the header')
+    checksum_algorithm, method, algorithm_data = decrypt(encrypted_part, sender_pubkey=sender_pubkey)
     # New header
     return encrypt(algorithm_data, privkey, recipient_pubkey, encryption_method=method, checksum_algorithm=checksum_algorithm)

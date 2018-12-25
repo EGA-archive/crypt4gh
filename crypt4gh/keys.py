@@ -1,248 +1,187 @@
 # -*- coding: utf-8 -*-
 
+'''
+This module implements the public/private key format for Crypt4GH.
+
+1. Overall format
+
+The key consists of a preamble, the public key and an encrypted matching private key.
+
+#define MAGIC_WORD      "crypt4gh"
+
+        byte[]	MAGIC_WORD
+	string	kdfname                                     [here: pbkdf2_hmac_sha256, or bcrypt]
+	string  (rounds || salt)                            [here: rounds is a 4 big-endian bytes]
+	string	ciphername                                  [here: chacha20_poly1305]
+	string	nonce (12 bytes) || encrypted private key
+	string	comment                                     [optional]
+
+Note: Everything "string" consists of a length n (encoded as 2 big-endian bytes) and a sequence of n bytes
+
+2. Encryption
+
+The KDF is used to derive a secret key from a user-supplied passphrase.
+A nonce is randomly generated, and used in conjonction with the secret key to encrypt the private key.
+The cipher is here Chacha20_Poly1305.
+
+3. No encryption
+
+In case both the ciphername is "none" and the KDF is "none", 
+are used with empty passphrases. The options if the KDF "none"
+are the empty string.
+
+4. Final output
+
+We encode the above data in Base64 and outputs the result with the following markers
+
+-----BEGIN CRYPT4GH PRIVATE KEY-----
+BASE64 ENCODED DATA
+-----END CRYPT4GH PRIVATE KEY-----
+
+For the public key
+-----BEGIN CRYPT4GH PUBLIC KEY-----
+BASE64 ENCODED DATA
+-----END CRYPT4GH PUBLIC KEY-----
+
+'''
+
 import os
+import io
+import logging
 from base64 import b64decode, b64encode
-import hashlib
+#from hashlib import pbkdf2_hmac
+import bcrypt
 
-import ed25519
 from nacl.public import PrivateKey
-from nacl.encoding import HexEncoder as KeyFormatter
+from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
-def generate_ec(seckey, pubkey, passphrase=None):
+LOG = logging.getLogger(__name__)
+
+MAGIC_WORD = b'crypt4gh'
+
+#######################################################################
+## Encoded strings
+#######################################################################
+def _encode_string(s):
+    return len(s).to_bytes(2,'big') + s
+
+def _decode_string(stream):
+    slen = int.from_bytes(stream.read(2), byteorder='big')
+    data = stream.read(slen)
+    if len(data) != slen:
+        raise ValueError("Invalid format: No enough data")
+    return data
+
+#######################################################################
+## Key Derivation
+#######################################################################
+
+def _derive_key(alg, passphrase, salt, rounds):
+    if alg == b'bcrypt':
+        return bcrypt.kdf(passphrase, salt=salt, desired_key_bytes=32, rounds=rounds)
+    if alg == b'pbkdf2_hmac_sha256':
+        return pbkdf2_hmac('sha256', passphrase, salt, rounds, dklen=32)
+    raise NotImplementedError(f'Unsupported KDF: {alg}')
+
+def retrieve_pubkey(private_key):
+    return PrivateKey(private_key).public_key
+
+#######################################################################
+## Encoding
+#######################################################################
+# I choose bcrypt or pbkdf2_hmac_sha256
+
+def _encode_encrypted_private_key(key, passphrase, comment, rounds):
+    kdfname = b'bcrypt'     # b'pbkdf2_hmac_sha256'
+    salt = os.urandom(16)   # os.urandom(16)
+    rounds = rounds or 100  # 100000
+    shared_key = _derive_key(kdfname, passphrase, salt, rounds)
+    nonce = os.urandom(12)
+    key_bytes = bytes(key)  # Uses RawEncoder
+    encrypted_key = ChaCha20Poly1305(shared_key).encrypt(nonce, key_bytes, None)  # No add
+
+    LOG.debug('Shared Key: %s', shared_key.hex().upper())
+    
+    return (MAGIC_WORD + 
+	    _encode_string(kdfname) +
+            _encode_string(rounds.to_bytes(4,'big') + salt) +
+	    _encode_string(b'chacha20_poly1305') + 
+	    _encode_string(nonce + encrypted_key) + 
+	    (_encode_string(comment) if comment is not None else b''))
+
+def _encode_unencrypted_private_key(key, comment):
+    return (MAGIC_WORD + 
+	    _encode_string(b'none') +
+	    _encode_string(b'none') + 
+	    _encode_string(bytes(key)) + # Uses the RawEncoder 
+	    (_encode_string(comment) if comment is not None else b''))
+
+
+def generate_ec(seckey, pubkey, callback=None, comment=None, rounds=100):
 
     # Generate the keys
     sk = PrivateKey.generate()
-    pk = sk.public_key
+    LOG.debug('Private Key: %s', bytes(sk).hex().upper())
 
-    # TODO: Encrypt the private key (like passphrase -> key, and AES)
+    with open(pubkey, 'bw') as f:
+        f.write(b'-----BEGIN CRYPT4GH PUBLIC KEY-----\n')
+        pkey = bytes(sk.public_key)
+        LOG.debug('Public Key: %s', pkey.hex().upper())
+        f.write(b64encode(pkey))
+        f.write(b'\n-----END CRYPT4GH PUBLIC KEY-----')
 
-    with open(pubkey, 'bw') as pubfile, open(seckey, 'bw') as privfile:
-        pubfile.write(pk.encode(KeyFormatter))
-        privfile.write(sk.encode(KeyFormatter))
-
-def generate_signing(signing_key, verifying_key, passphrase=None):
-
-    # Generate the keys
-    sk, vk = ed25519.create_keypair()
-
-    # TODO: Encrypt the private key (like passphrase -> key, and AES)
-
-    # signing_key: private part, verifying_key: public part
-    with open(verifying_key, 'wt') as pubfile, open(signing_key, 'wt') as privfile:
-        pubfile.write(vk.to_bytes().hex())
-        privfile.write(sk.to_bytes().hex())
-
-
-if __name__ == '__main__':
-    import sys
-    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-    from cryptography.hazmat.backends import default_backend
-    # import bcrypt
-    # with open(sys.argv[1], 'rb') as f:
-    #     lines = [line.strip() for line in f.readlines()]
-    #     if (b'-----BEGIN OPENSSH PRIVATE KEY-----' != lines[0] or
-    #         b'-----END OPENSSH PRIVATE KEY-----' != lines[-1]):
-    #         print('Not an OpenSSH or SSH2 key')
-
-    #     print('OPENSSH key format')
-    #     b = b''.join([r for r in lines[1:-1] if not r.lower().startswith(b'comment: ') ])
-    #     a = b64decode(b)
-    #     print(a)
-    #     print('='*30)
-    #     ptr = 15
-    #     print(a[:ptr])
-
-    #     alg_len = int.from_bytes(a[ptr:ptr+4], 'big')
-    #     print('alg len:', alg_len)
-    #     ptr+=4
-    #     alg = a[ptr:ptr+alg_len]
-    #     print('alg:', alg)
-    #     ptr+= alg_len
-
-    #     kdf_len = int.from_bytes(a[ptr:ptr+4], 'big')
-    #     print('kdf len:', kdf_len)
-    #     ptr+= 4
-    #     kdf = a[ptr:ptr+kdf_len]
-    #     print('kdf:', kdf)
-    #     ptr+= kdf_len
-
-    #     kdf_buf_len = int.from_bytes(a[ptr:ptr+4], 'big')
-    #     print('kdf buf len:', kdf_buf_len)
-    #     ptr+= 4
-    #     kdf_buf = a[ptr:ptr+kdf_buf_len]
-    #     ptr+= kdf_buf_len
-
-    #     salt_len = int.from_bytes(kdf_buf[:4], 'big')
-    #     print('salt len:', salt_len)
-    #     salt = kdf_buf[4:4+salt_len]
-    #     print('salt:', salt)
-
-    #     rounds = int.from_bytes(kdf_buf[4+salt_len:4+salt_len+4], 'big') # rounds is 4 bytes
-    #     print('rounds:', rounds)
+    with open(seckey, 'bw') as f:
+        f.write(b'-----BEGIN PRIVATE KEY-----\n')
+        if callback:
+            passphrase = callback()
+            pkey = _encode_encrypted_private_key(sk, passphrase.encode(), comment, rounds)
+        else:
+            pkey = _encode_unencrypted_private_key(sk, comment)
+        LOG.debug('Encoded Private Key: %s', pkey.hex().upper())
+        f.write(b64encode(pkey))
+        f.write(b'\n-----END PRIVATE KEY-----')
 
 
-    #     nkeys = int.from_bytes(a[ptr:ptr+4], 'big')
-    #     print('nkeys:', nkeys)
-    #     ptr+= 4
-
-    #     pubkey_len = int.from_bytes(a[ptr:ptr+4], 'big')
-    #     print('pubkey len:', pubkey_len)
-    #     ptr+=4
-    #     pubkey = a[ptr:ptr+pubkey_len]
-    #     print('pubkey:', pubkey)
-    #     ptr+= pubkey_len
-
-    #     # Parse Pubkey
-    #     pubkey_type_len = int.from_bytes(pubkey[:4], 'big')
-    #     pubkey_type = pubkey[4:4+pubkey_type_len]
-    #     print('public key type:', pubkey_type)
-    #     pubkey_content_len = int.from_bytes(pubkey[4+pubkey_type_len:pubkey_type_len+8], 'big')
-    #     pubkey_content = pubkey[pubkey_type_len+8:pubkey_type_len+8+pubkey_content_len]
-    #     print('public key:', pubkey_content.hex()) # 32 bytes
-
-    #     # Parse Privkey
-    #     encrypted_privkey_len = int.from_bytes(a[ptr:ptr+4], 'big')
-    #     print('encrypted privkey len:', encrypted_privkey_len)
-    #     ptr+=4
-    #     encrypted_privkey = a[ptr:ptr+encrypted_privkey_len]
-    #     print('encrypted privkey:', encrypted_privkey)
-    #     ptr+= encrypted_privkey_len
-    #     assert( encrypted_privkey_len == len(encrypted_privkey) )
-    #     assert( a[ptr:] == b'' )
+#######################################################################
+## Decoding
+#######################################################################
 
 
-    #     h = bcrypt.kdf(password=sys.argv[2].encode(),
-    #                      salt=salt,
-    #                      desired_key_bytes=32+16,
-    #                      rounds=rounds)
-    #     key = h[:32]
-    #     print('key:', key)
-    #     iv = h[32:] # block size of aes256-cbc
-    #     print('iv:', iv)
-    #     backend = default_backend()
-    #     cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=backend)
-    #     decryptor = cipher.decryptor()
-    #     privkey = decryptor.update(encrypted_privkey) + decryptor.finalize()
+def load(keyfile):
+    with open(keyfile, 'rb') as f:
+        return b64decode(b''.join(f.readlines()[1:-1]))
 
-    #     random_check = int.from_bytes(privkey[:4], 'big')
-    #     random_check2 = int.from_bytes(privkey[4:8], 'big')
-    #     if (random_check2 != random_check):
-    #         print('Random check  :', random_check)
-    #         print('Random check 2:', random_check2)
-    #         print('Wrong passphrase')
-    #         sys.exit(1)
+def get_public_key(keyfile):
+    return load(keyfile)
 
-    #     privkey = privkey[8:]
-    #     print('privkey:', privkey)
+def get_private_key(keyfile, callback):
+    stream = io.BytesIO(load(keyfile))
+    if MAGIC_WORD != stream.read(8):
+        raise ValueError('Invalid key format')
 
-    #     # key name
-    #     name_len = int.from_bytes(privkey[:4], 'big')
-    #     name = privkey[4:4+name_len]
-    #     print('key name:', name)
-    #     privkey = privkey[4+name_len:]
+    kdfname = _decode_string(stream)
+    if kdfname == b'none':
+        ciphername = _decode_string(stream)
+        assert( ciphername == b'none' )
+        LOG.debug("Not encrypted")
+        return _decode_string(stream)
 
-    #     # pub part again
-    #     pkey_len = int.from_bytes(privkey[:4], 'big')
-    #     pkey = privkey[4:4+pkey_len]
-    #     print('public key:', pkey.hex())
-    #     privkey = privkey[4+pkey_len:]
+    # We have an encrypted private key
+    kdfoptions = _decode_string(stream)
+    rounds = int.from_bytes(kdfoptions[:4], byteorder='big')
+    salt = kdfoptions[4:]
 
-    #     # Private key
-    #     seckey_len = int.from_bytes(privkey[:4], 'big')
-    #     seckey = privkey[4:4+seckey_len]
-    #     print('private key:', seckey.hex())
-    #     privkey = privkey[4+seckey_len:]
+    LOG.debug("Encrypted with %s [rounds: %d]", kdfname, rounds)
 
-    #     # Comment
-    #     comment_len = int.from_bytes(privkey[:4], 'big')
-    #     comment = privkey[4:4+comment_len]
-    #     print('Comment:', comment)
-        
+    ciphername = _decode_string(stream)
+    if ciphername != b'chacha20_poly1305':
+        raise NotImplementedError(f'Unsupported Cipher: {ciphername}')
 
-        # # Test
-        # sk = PrivateKey.generate()
-        # pk = sk.public_key
-        # print('gen pubkey:', pk.encode(KeyFormatter))
-        # print('gen seckey:', sk.encode(KeyFormatter))
-
-    from asn1crypto import pem
-    from asn1crypto.core import ObjectIdentifier
-    from asn1crypto.keys import EncryptedPrivateKeyInfo, PrivateKeyInfo, OctetString
-    with open(sys.argv[3], 'rb') as f:
-        der_bytes = f.read()
-    if pem.detect(der_bytes):
-        _, _, der_bytes = pem.unarmor(der_bytes)
-    key = EncryptedPrivateKeyInfo.load(der_bytes)
-    #print(key)
-    enc = key['encryption_algorithm']
-    #print(help(encryption_algorithm))
-    #print(encryption_algorithm.map(encryption_algorithm['algorithm']))
-    #assert encryption_algorithm['algorithm'] == 'pbes2', "Unsupported encryption algorithm"
-    salt = enc.kdf_salt
-    rounds = enc.kdf_iterations
-    hash_alg = enc.kdf_hmac
-    print('hash:',hash_alg)
-    print('salt:',salt)
-    print('rounds:',rounds)
-    #key_length = encryption_algorithm.key_length if encryption_algorithm.key_length else 32
-    #print('key_length:',key_length)
-    #encryption_scheme = encryption_algorithm['encryption_scheme']
-    passphrase = sys.argv[4].encode()
-    print('passphrase:', passphrase)
-
-    from pprint import pprint
-    pprint(key.native)
-
-    dk = hashlib.pbkdf2_hmac(hash_alg, passphrase, salt, int(rounds))
-    print('key:', dk.hex(), len(dk))
-
-    encrypted_data = key['encrypted_data']
-    print('data:',encrypted_data)
-    
-    alg = enc.encryption_cipher
-    print('alg:',alg)
-    iv = enc.encryption_iv
-    print('iv:',iv)
-    mode = enc.encryption_mode
-    print('mode:',mode)
-    # alg = encryption_scheme['algorithm']
-    # print('alg:',alg)
-    # iv = encryption_scheme['parameters']
-    # print('iv:',iv)
-
-    cipher_alg = getattr(algorithms, alg.upper(), None)
-    cipher_mode = getattr(modes, mode.upper(), None)
-    if not cipher_alg or not cipher_mode:
-        raise NotImplementedError('Unsupported algorithm')
-    
-    backend = default_backend()
-    cipher = Cipher(cipher_alg(dk), cipher_mode(iv), backend=backend)
-    decryptor = cipher.decryptor()
-    privkey = decryptor.update(encrypted_data.native) + decryptor.finalize()
-
-    print('decrypted data:', privkey.hex())
-
-    from pyasn1.codec.der.decoder import decode
-
-    thekey = decode(der_bytes)
-    print(thekey)
-
-    pkey = decode(privkey)
-    print(pkey)
-    data = pkey[0][2]
-
-    print(data.asOctets().hex())
-    # print('pubkey:', privkey[:32].hex())
-    # print('privkey:', privkey[32:].hex())
-    
-
-#     data = bytes.fromhex('51F807195C69CE0B281B60417787DF5C107AAB8A0B951FC2F154ACDE6BB4FCAE526E200048DD75164169600B92CCD3AD7263C18F16FB3A
-# 5F17F3B55D025646A8')
-#     salt = bytes.fromhex('76F329189EA09BB1')
-#     rounds = 2048
-#     iv = bytes.fromhex('63B16CFC5F304FB011CB4EC96DB1D400')
-    
-#     key = 
-#     cipher = Cipher(algorithms.ARS(dk), cipher_mode(iv), backend=backend)
-#     decryptor = cipher.decryptor()
-#     privkey = decryptor.update(encrypted_data.native) + decryptor.finalize()
+    assert( callback )
+    passphrase = callback()
+    shared_key = _derive_key(kdfname, passphrase.encode(), salt, rounds)
+    LOG.debug('Shared Key: %s', shared_key.hex().upper())
+    private_data = _decode_string(stream)
+    nonce = private_data[:12]
+    encrypted_data = private_data[12:]
+    return ChaCha20Poly1305(shared_key).decrypt(nonce, encrypted_data, None)  # No add

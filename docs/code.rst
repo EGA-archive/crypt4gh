@@ -9,7 +9,8 @@ Python Modules
 .. autosummary::
 
     crypt4gh.cli
-    crypt4gh.crypt4gh
+    crypt4gh.engine
+    crypt4gh.header
     crypt4gh.keys
 
 ************
@@ -24,7 +25,10 @@ Command Line
 Crypt4gh
 ********
 
-.. automodule:: crypt4gh.crypt4gh
-   :members: Header, encrypt, decrypt, reencrypt
+.. automodule:: crypt4gh.engine
+   :members: encrypt, decrypt, reencrypt
+
+.. automodule:: crypt4gh.header
+   :members: encrypt, decrypt, reencrypt
 
 :ref:`genindex` | :ref:`modindex`

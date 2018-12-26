@@ -13,25 +13,23 @@ DEFAULT_LOG = os.getenv('C4GH_LOG', None)
 
 __doc__ = f'''
 
-LocalEGA utilities for the cryptographic GA4GH standard.
-Reads from stdin and Outputs to stdout
+Utility for the cryptographic GA4GH standard, reading from stdin and outputting to stdout.
 
 Usage:
    {PROG} [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path>
-   {PROG} [-hv] [--log <file>] decrypt [--sender_pk <path>] [--sk <path>]
-   {PROG} [-hv] [--log <file>] reencrypt [--sender_public_key <path>] [--sk <path>] --recipient_pk <path>
+   {PROG} [-hv] [--log <file>] decrypt [--sk <path>] [--sender_pk <path>]
+   {PROG} [-hv] [--log <file>] reencrypt [--sk <path>] --recipient_pk <path> [--sender_public_key <path>]
    {PROG} [-hv] [--log <file>] generate [-f] [--pk <path>] [--sk <path>] [--nocrypt] [-C <comment>] [-R <rounds>]
 
 Options:
    -h, --help             Prints this help and exit
    -v, --version          Prints the version and exits
    --log <file>           Path to the logger file (in YML format)
-   --pk <keyfile>         Public Curve25519 key used for signing [default: ~/.c4gh/key.pub]
-   --sk <keyfile>         Private Curve25519 key to be used for decryption [default: ~/.c4gh/key]
-   --recipient_pk <path>  Recipient's public key
-   --sender_pk <path>     Peer's Public Curve25519 key to verify provenance (aka, signature)
-   --sign                 Whether the sender should be authenticated
-   -C <comment>           Key Comment
+   --sk <keyfile>         Curve25519-based Private key [default: ~/.c4gh/key]
+   --pk <keyfile>         Curve25519-based Public key  [default: ~/.c4gh/key.pub]
+   --recipient_pk <path>  Recipient's Curve25519-based Public key
+   --sender_pk <path>     Peer's Curve25519-based Public key to verify provenance (aka, signature)
+   -C <comment>           Key's Comment
    --nocrypt              Do not encrypt the private key.
                           Otherwise it is encrypted in the Crypt4GH key format
    -R <rounds>            Numbers of rounds for the key derivation. Ignore it to use the defaults.
@@ -39,7 +37,6 @@ Options:
 
 Environment variables:
    C4GH_LOG         If defined, it will be used as the default logger
-   C4GH_PUBLIC_KEY  If defined, it will be used as the default public key (ie --pk ${{C4GH_PUBLIC_KEY}})
    C4GH_SECRET_KEY  If defined, it will be used as the default secret key (ie --sk ${{C4GH_SECRET_KEY}})
 
 '''

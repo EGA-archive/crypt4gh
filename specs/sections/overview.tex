@@ -7,8 +7,7 @@ The header lists:
 \item the header encryption method
 \item the encrypter's public key
 \item the checksum algorithm
-\item the encryption algorithm, and
-\item the encryption key needed to decrypt the encrypted data portion.
+\item the encryption algorithm, and the encryption key needed to decrypt the encrypted data portion.
 \end{itemize}
 
 The encrypted data portion is the actual application data.
@@ -17,5 +16,5 @@ It is encrypted using a symmetric encryption algorithm, as specified in the head
 % 
 The data is encrypted in 64 kilobytes segments. For each encrypted segment, a 12 bytes nonce is prepended and a 16 bytes MAC is appended.
 % 
-The encrypted data portion may include a checksum of the unencrypted data, if the checksum algorithm is listed in the encrypted header.
+The encrypted data portion may include a checksum of the unencrypted data, if the checksum algorithm is listed in the header.
 

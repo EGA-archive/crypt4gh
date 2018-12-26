@@ -36,6 +36,19 @@ The nonce is prepended to the encrypted segment. Recall that ChaCha20-Poly1305 a
 %
 This expands the data by 28 bytes, so a 65536 byte plaintext input will become a 65564 byte encrypted and authenticated ciphertext output.
 
+\begin{verbatim}
+struct Segment {
+  select (method) {
+    case chacha20_ietf_poly1305:
+      byte    nonce[12];
+      byte[]  encrypted_data;
+      byte    mac[16];
+  };
+};
+\end{verbatim}
+
+The encrypted data portion is composed of a sequence of segements of at most 65564 bytes. If a segment has a predecessor, the predecessor must be of size 65564 bytes. Note that the plaintext data encrypted in the last segment of the sequence might contain a checksum value of the unencrypted file content, as specified in the header.
+
 % ------------------------
 \subsection{Decryption}
 The plaintext is obtained by authenticating and decrypting the encrypted segment(s) enclosing the requested byte range $[P;Q]$, where $P<Q$.

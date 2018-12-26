@@ -22,8 +22,8 @@ class Mock(MagicMock):
 
 
 # Some modules need to be mocked
-MOCK_MODULES = ['cryptography.hazmat.primitives.ciphers', 'cryptography.hazmat.backends',
-                'yaml', 'terminaltables', 'pgpy', 'docopt', 'cryptography.hazmat']
+MOCK_MODULES = ['cryptography.hazmat.primitives.ciphers.aead', 'nacl.bindings', 'nacl.public',
+                'yaml', 'docopt', 'bcrypt']
 sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
 # If your documentation needs a minimal Sphinx version, state it here.

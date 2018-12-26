@@ -1,10 +1,5 @@
 # -*- coding: utf-8 -*-
-
-###########################################################
-##
-##         Crypt4GH header
-##
-###########################################################
+"""Generate and parse a Crypt4GH header."""
 
 import os
 import logging

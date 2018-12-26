@@ -1,4 +1,10 @@
 # -*- coding: utf-8 -*-
+"""Handle the encryption of the application data.
+
+It encrypts or decrypts a given file read from stdin, and outputs the result to stdout.
+
+It also reencrypts Crypt4GH-formatted input, into another Crypt4GH-formatted output.
+"""
 
 import os
 import logging
@@ -24,11 +30,11 @@ SEGMENT_SIZE = 65536
 # 2: sha256
 # else: NotImplemented / NotSupported
 
-def raise_if_not_supported_checksum(checksum):
+def _raise_if_not_supported_checksum(checksum):
     if checksum not in (0,1,2):
         raise ValueError('Unsupported checksum algorithm')
 
-def get_checksum_algorithm(checksum):
+def _get_checksum_algorithm(checksum):
     if checksum == 0:
         return None
     if checksum == 1:
@@ -47,7 +53,7 @@ DEFAULT_CHECKSUM_ALGORITHM = 2
 # 1: AES-256-CTR => Not Implemented
 # else: NotSupported
 
-def raise_if_not_supported_method(method):
+def _raise_if_not_supported_method(method):
     if method == 0:
         return
     if method == 1:
@@ -62,6 +68,7 @@ def raise_if_not_supported_method(method):
 ##############################################################
 
 def _encrypt_segment(data, outfile, session_key):
+    '''Utility function to generate a nonce, encrypt data with Chacha20, and authenticate it with Poly1305.'''
     #LOG.debug("Segment: %s..%s", data[:30], data[-30:])
 
     cipher = ChaCha20Poly1305(session_key)
@@ -71,7 +78,10 @@ def _encrypt_segment(data, outfile, session_key):
     outfile.write(encrypted_data)
 
 def encrypt(seckey, recipient_pubkey, infile, outfile, checksum_algorithm=DEFAULT_CHECKSUM_ALGORITHM):
+    '''Encrypt infile into outfile, using seckey and recipient_pubkey.
 
+    If checksum_algorithm is not 0, the computed checksum value, over infile is appended to the data.
+    '''
     LOG.info('Encrypting the file')
     session_key = os.urandom(32)
 
@@ -80,7 +90,7 @@ def encrypt(seckey, recipient_pubkey, infile, outfile, checksum_algorithm=DEFAUL
     outfile.write(header_bytes)
 
     LOG.debug("Preparing the checksum")
-    md = get_checksum_algorithm(checksum_algorithm)
+    md = _get_checksum_algorithm(checksum_algorithm)
 
     LOG.debug("Streaming content")
     # Boy... I buffer a whole segment!
@@ -117,18 +127,23 @@ def encrypt(seckey, recipient_pubkey, infile, outfile, checksum_algorithm=DEFAUL
 # - send it (in mem) to another quality control pass
 
 @convert_error
-def body_decrypt(infile, checksum_algorithm, method, session_key, process_output=None):
-    '''Decrypting the data section and verifying its sha256 checksum'''
+def body_decrypt(infile, checksum_algorithm, method, session_key, process_output=None, start_coordinate=0, end_coordinate=None):
+    '''Decrypting the data section and verifying its checksum'''
 
     LOG.debug("Checksum algorithm: %s", checksum_algorithm)
     LOG.debug(" Encryption Method: %s", method)
     LOG.debug("       Session Key: %s", session_key.hex())
 
-    raise_if_not_supported_method(method)
+    _raise_if_not_supported_method(method)
     LOG.info("Decrypting content")
     
-    md = get_checksum_algorithm(checksum_algorithm)
+    md = _get_checksum_algorithm(checksum_algorithm)
     LOG.debug("Preparing the checksum: %s", md)
+
+    if md and (start_coordinate != 0 or
+               end_coordinate is not None):
+        LOG.debug("Requesting a range: Turning off the message digest")
+        md = None
 
     cipher = ChaCha20Poly1305(session_key)
     do_process = callable(process_output)
@@ -188,6 +203,10 @@ def body_decrypt(infile, checksum_algorithm, method, session_key, process_output
 
     
 def decrypt(seckey, infile, outfile, sender_pubkey=None):
+    '''Decrypt infile into outfile, using seckey.
+
+    If sender_pubkey is specified, it verifies the provenance of the header
+    '''
     LOG.info('Decrypting file')
     header_data = header_parse(infile)
     #LOG.debug('Header is the header\n %s', header)
@@ -196,21 +215,18 @@ def decrypt(seckey, infile, outfile, sender_pubkey=None):
     return body_decrypt(infile, checksum_algorithm, method, session_key, process_output=outfile.write)
 
 
-def reencrypt(seckey, recipient_pubkey, infile, sender_pubkey=None, process_output=lambda _:None, chunk_size=4096):
-    '''Extract header and update with another one.
-    The data section is only copied'''
-
-    assert( callable(process_output) )
+def reencrypt(seckey, recipient_pubkey, infile, outfile, sender_pubkey=None, chunk_size=4096):
+    '''Extract header from infile and generetes another one to outfile. The encrypted data section is only copied from infile to outfile.'''
 
     header_data = header_parse(infile)
     header = header_reencrypt(header_data, seckey, recipient_pubkey, sender_pubkey=None)
-    process_output(header)
+    outfile.write(header)
 
     LOG.info(f'Streaming the remainer of the file')
     while True:
         data = infile.read(chunk_size)
         if not data:
             break
-        process_output(data)
+        outfile.write(data)
 
     LOG.info('Reencryption Successful')

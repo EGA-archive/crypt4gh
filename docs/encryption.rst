@@ -2,16 +2,19 @@ Encryption Algorithm - Crypt4GH
 ===============================
 
 A random session key (of 256 bits) is generated to seed an ChaCha20
-engine, with Poly1305 authentication mode. A nonce is also randomly
-generated for the engine, along with a counter. Using the two latters,
-the original file is encrypted and a header is prepended to the
-encrypted data. The file is chunked in blocks of 64 kB.
+engine, with Poly1305 authentication mode. For each segment of at most
+64kB of data, a nonce is randomly generated and prepended to the
+segment. Using the two latters, the original file is segmented and
+each segment is encrypted. The last segment may contain a checksum of
+the original file, if stated in the header.
 
-Informally, the header contains, in order, the word ``crypt4gh``, the
+The header is prepended to the encrypted data.
+
+Informally, the header contains, the word ``crypt4gh``, the
 format version (currently 1), the length of the remainder of the
 header and the remainder.
 
-The remainder of the header is encrypted using elliptic curve 25519.
+The remainder of the header contains encrypted data, using a Curve25519-based encryption.
 
 .. image:: /static/encryption.png
    :target: ../_static/encryption.png

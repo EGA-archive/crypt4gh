@@ -32,8 +32,8 @@ The usual ``-h`` flag shows you the different options that the tool accepts.
     -f                     Overwrite the destination files
 
     Environment variables:
-		C4GH_LOG         If defined, it will be used as the default logger
-		C4GH_SECRET_KEY  If defined, it will be used as the default secret key (ie --sk ${C4GH_SECRET_KEY})
+	C4GH_LOG         If defined, it will be used as the default logger
+	C4GH_SECRET_KEY  If defined, it will be used as the default secret key (ie --sk ${C4GH_SECRET_KEY})
 
 Examples
 --------

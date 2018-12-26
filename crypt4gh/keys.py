@@ -1,46 +1,6 @@
 # -*- coding: utf-8 -*-
 
-'''
-This module implements the public/private key format for Crypt4GH.
-
-1. Overall enrcypted format
-
-An encrypted key consists of a preamble, encrypted data and an optional comment.
-
-#define MAGIC_WORD      "crypt4gh"
-
-        byte[]	MAGIC_WORD
-	string	kdfname                                     [here: pbkdf2_hmac_sha256, or bcrypt]
-	string  (rounds || salt)                            [here: rounds is a 4 big-endian bytes]
-	string	ciphername                                  [here: chacha20_poly1305]
-	string	nonce (12 bytes) || encrypted private key
-	string	comment                                     [optional]
-
-Note: Everything "string" consists of a length n (encoded as 2 big-endian bytes) and a sequence of n bytes
-
-2. Encryption
-
-The KDF is used to derive a secret key from a user-supplied passphrase.
-A nonce is randomly generated, and used in conjonction with the secret key to encrypt the private key.
-The cipher is here Chacha20_Poly1305.
-
-3. No encryption
-
-In case both the ciphername is "none" and the KDF is "none", 
-are used with empty passphrases. The options if the KDF "none"
-are the empty string.
-
-4. Final output
-
-We encode the above data in Base64 and outputs the result with the following markers
-
------BEGIN CRYPT4GH <type> KEY-----
-BASE64 ENCODED DATA
------END CRYPT4GH <type> KEY-----
-
-where <type> is PUBLIC, PRIVATE or ENCRYPTED PRIVATE
-
-'''
+'''This module implements the public/private key format for Crypt4GH.'''
 
 import os
 import io
@@ -81,6 +41,7 @@ def _derive_key(alg, passphrase, salt, rounds):
     raise NotImplementedError(f'Unsupported KDF: {alg}')
 
 def retrieve_pubkey(private_key):
+    '''Get public key from private key'''
     return PrivateKey(private_key).public_key
 
 #######################################################################
@@ -107,7 +68,8 @@ def _encode_encrypted_private_key(key, passphrase, comment, rounds):
 	    (_encode_string(comment) if comment is not None else b''))
 
 
-def generate_ec(seckey, pubkey, callback=None, comment=None, rounds=100):
+def generate(seckey, pubkey, callback=None, comment=None, rounds=100):
+    '''Generate a keypair.'''
 
     # Generate the keys
     sk = PrivateKey.generate()
@@ -179,11 +141,16 @@ def _load(keyfile):
         return is_encrypted, b64decode(b''.join(lines[1:-1]))
 
 def get_public_key(keyfile):
+    '''Read the public key from keyfile location.'''
     is_encrypted, data = _load(keyfile)
     assert( not is_encrypted )
     return data
 
 def get_private_key(keyfile, callback):
+    '''Read the private key from keyfile location.
+
+    If the private key is encrypted, the user will be prompted for the passphrase.
+    '''
     is_encrypted, data = _load(keyfile)
     if is_encrypted:
         return _parse_encrypted_key(io.BytesIO(data), callback)

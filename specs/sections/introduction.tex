@@ -2,9 +2,6 @@
 \section{Introduction}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection{Purpose}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 By its nature, genomic data can include information of a confidential nature about the health of individuals.
 %
 It is important that such information is not accidentally disclosed.
@@ -17,6 +14,25 @@ This document describes a file format that can be used to store data in an encry
 Existing applications can, with minimal modification, read and write data in the encrypted format.
 %
 The choice of encryption also allows the encrypted data to be read starting from any location, facilitating indexed access to files.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Encrypted Representation Overview}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+The encrypted file consists of two parts: the header and the encrypted data portion.
+
+The header encapsulates its data and prepends a magic number and a version number.
+%
+We describe its construction in Section~\ref{header}.
+
+The encrypted data portion is the actual application data, described in Section~\ref{data:encrypted}.
+% 
+It is encrypted using a symmetric encryption algorithm, as specified in the header.
+% 
+The data is encrypted in 64 kilobytes segments. For each encrypted segment, a 12 bytes nonce is prepended and a 16 bytes MAC is appended.
+% 
+The encrypted data portion may include a checksum of the unencrypted data, if the checksum algorithm is listed in the header.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Requirements}

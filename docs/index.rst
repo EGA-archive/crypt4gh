@@ -30,6 +30,7 @@ Table of Contents
 
    Installation         <setup>
    Encryption           <encryption>
+   Key Format           <keys>
    Usage & Examples     <usage>
    Python Modules       <code>
 

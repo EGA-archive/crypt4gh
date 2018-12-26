@@ -3,9 +3,9 @@
 '''
 This module implements the public/private key format for Crypt4GH.
 
-1. Overall format
+1. Overall enrcypted format
 
-The key consists of a preamble, the public key and an encrypted matching private key.
+An encrypted key consists of a preamble, encrypted data and an optional comment.
 
 #define MAGIC_WORD      "crypt4gh"
 
@@ -34,14 +34,11 @@ are the empty string.
 
 We encode the above data in Base64 and outputs the result with the following markers
 
------BEGIN CRYPT4GH PRIVATE KEY-----
+-----BEGIN CRYPT4GH <type> KEY-----
 BASE64 ENCODED DATA
------END CRYPT4GH PRIVATE KEY-----
+-----END CRYPT4GH <type> KEY-----
 
-For the public key
------BEGIN CRYPT4GH PUBLIC KEY-----
-BASE64 ENCODED DATA
------END CRYPT4GH PUBLIC KEY-----
+where <type> is PUBLIC, PRIVATE or ENCRYPTED PRIVATE
 
 '''
 
@@ -89,7 +86,7 @@ def retrieve_pubkey(private_key):
 #######################################################################
 ## Encoding
 #######################################################################
-# I choose bcrypt or pbkdf2_hmac_sha256
+# I choose bcrypt over pbkdf2_hmac_sha256
 
 def _encode_encrypted_private_key(key, passphrase, comment, rounds):
     kdfname = b'bcrypt'     # b'pbkdf2_hmac_sha256'
@@ -109,13 +106,6 @@ def _encode_encrypted_private_key(key, passphrase, comment, rounds):
 	    _encode_string(nonce + encrypted_key) + 
 	    (_encode_string(comment) if comment is not None else b''))
 
-def _encode_unencrypted_private_key(key, comment):
-    return (MAGIC_WORD + 
-	    _encode_string(b'none') +
-	    _encode_string(b'none') + 
-	    _encode_string(bytes(key)) + # Uses the RawEncoder 
-	    (_encode_string(comment) if comment is not None else b''))
-
 
 def generate_ec(seckey, pubkey, callback=None, comment=None, rounds=100):
 
@@ -131,42 +121,38 @@ def generate_ec(seckey, pubkey, callback=None, comment=None, rounds=100):
         f.write(b'\n-----END CRYPT4GH PUBLIC KEY-----')
 
     with open(seckey, 'bw') as f:
-        f.write(b'-----BEGIN PRIVATE KEY-----\n')
+        is_encrypted = False
         if callback:
+            is_encrypted = True
             passphrase = callback()
             pkey = _encode_encrypted_private_key(sk, passphrase.encode(), comment, rounds)
+            LOG.debug('Encoded Private Key: %s', pkey.hex().upper())
         else:
-            pkey = _encode_unencrypted_private_key(sk, comment)
-        LOG.debug('Encoded Private Key: %s', pkey.hex().upper())
+            print(f'WARNING: The private key {seckey} is not encrypted', file=sys.stderr)
+            pkey = bytes(sk)
+            LOG.debug('Non-Encrypted Private Key: %s', pkey.hex().upper())
+
+        f.write(b'-----BEGIN ')
+        if is_encrypted:
+            f.write(b'ENCRYPTED ')
+        f.write(b'PRIVATE KEY-----\n')
         f.write(b64encode(pkey))
-        f.write(b'\n-----END PRIVATE KEY-----')
+        f.write(b'\n-----END ')
+        if is_encrypted:
+            f.write(b'ENCRYPTED ')
+        f.write(b'PRIVATE KEY-----\n')
 
 
 #######################################################################
 ## Decoding
 #######################################################################
 
+def _parse_encrypted_key(stream, callback):
 
-def load(keyfile):
-    with open(keyfile, 'rb') as f:
-        return b64decode(b''.join(f.readlines()[1:-1]))
-
-def get_public_key(keyfile):
-    return load(keyfile)
-
-def get_private_key(keyfile, callback):
-    stream = io.BytesIO(load(keyfile))
     if MAGIC_WORD != stream.read(8):
         raise ValueError('Invalid key format')
 
     kdfname = _decode_string(stream)
-    if kdfname == b'none':
-        ciphername = _decode_string(stream)
-        assert( ciphername == b'none' )
-        LOG.debug("Not encrypted")
-        return _decode_string(stream)
-
-    # We have an encrypted private key
     kdfoptions = _decode_string(stream)
     rounds = int.from_bytes(kdfoptions[:4], byteorder='big')
     salt = kdfoptions[4:]
@@ -177,7 +163,7 @@ def get_private_key(keyfile, callback):
     if ciphername != b'chacha20_poly1305':
         raise NotImplementedError(f'Unsupported Cipher: {ciphername}')
 
-    assert( callback )
+    assert( callback and callable(callback) )
     passphrase = callback()
     shared_key = _derive_key(kdfname, passphrase.encode(), salt, rounds)
     LOG.debug('Shared Key: %s', shared_key.hex().upper())
@@ -185,3 +171,22 @@ def get_private_key(keyfile, callback):
     nonce = private_data[:12]
     encrypted_data = private_data[12:]
     return ChaCha20Poly1305(shared_key).decrypt(nonce, encrypted_data, None)  # No add
+
+def _load(keyfile):
+    with open(keyfile, 'rb') as f:
+        lines = f.readlines()
+        is_encrypted = (b'ENCRYPTED' in lines[0])
+        return is_encrypted, b64decode(b''.join(lines[1:-1]))
+
+def get_public_key(keyfile):
+    is_encrypted, data = _load(keyfile)
+    assert( not is_encrypted )
+    return data
+
+def get_private_key(keyfile, callback):
+    is_encrypted, data = _load(keyfile)
+    if is_encrypted:
+        return _parse_encrypted_key(io.BytesIO(data), callback)
+    return data
+
+

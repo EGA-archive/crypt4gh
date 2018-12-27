@@ -202,7 +202,7 @@ def body_decrypt(infile, checksum_algorithm, method, session_key, process_output
     LOG.info('Decryption Successful')
 
     
-def decrypt(seckey, infile, outfile, sender_pubkey=None):
+def decrypt(seckey, infile, outfile, sender_pubkey=None, start_coordinate=0, end_coordinate=None):
     '''Decrypt infile into outfile, using seckey.
 
     If sender_pubkey is specified, it verifies the provenance of the header
@@ -212,7 +212,13 @@ def decrypt(seckey, infile, outfile, sender_pubkey=None):
     #LOG.debug('Header is the header\n %s', header)
     checksum_algorithm, method, session_key = header_decrypt(header_data, seckey, sender_pubkey=sender_pubkey)
     # Decrypt the rest
-    return body_decrypt(infile, checksum_algorithm, method, session_key, process_output=outfile.write)
+    return body_decrypt(infile,
+                        checksum_algorithm,
+                        method,
+                        session_key,
+                        process_output=outfile.write,
+                        start_coordinate=start_coordinate,
+                        end_coordinate=end_coordinate)
 
 
 def reencrypt(seckey, recipient_pubkey, infile, outfile, sender_pubkey=None, chunk_size=4096):

@@ -53,12 +53,13 @@ def _encode_encrypted_private_key(key, passphrase, comment, rounds):
     kdfname = b'bcrypt'     # b'pbkdf2_hmac_sha256'
     salt = os.urandom(16)   # os.urandom(16)
     rounds = rounds or 100  # 100000
-    shared_key = _derive_key(kdfname, passphrase, salt, rounds)
+    derived_key = _derive_key(kdfname, passphrase, salt, rounds)
     nonce = os.urandom(12)
     key_bytes = bytes(key)  # Uses RawEncoder
-    encrypted_key = ChaCha20Poly1305(shared_key).encrypt(nonce, key_bytes, None)  # No add
+    encrypted_key = ChaCha20Poly1305(derived_key).encrypt(nonce, key_bytes, None)  # No add
 
-    LOG.debug('Shared Key: %s', shared_key.hex().upper())
+    LOG.debug('Derived Key: %s', derived_key.hex().upper())
+    LOG.debug('      Nonce: %s', nonce.hex().upper())
     
     return (MAGIC_WORD + 
 	    _encode_string(kdfname) +
@@ -80,7 +81,7 @@ def generate(seckey, pubkey, callback=None, comment=None, rounds=100):
         pkey = bytes(sk.public_key)
         LOG.debug('Public Key: %s', pkey.hex().upper())
         f.write(b64encode(pkey))
-        f.write(b'\n-----END CRYPT4GH PUBLIC KEY-----')
+        f.write(b'\n-----END CRYPT4GH PUBLIC KEY-----\n')
 
     with open(seckey, 'bw') as f:
         is_encrypted = False

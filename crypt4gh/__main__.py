@@ -48,6 +48,24 @@ def run(args):
     ##################################### 
     if args['decrypt']:
 
+        kw = {}
+        if args['--sender_pk']:
+            kw['sender_pubkey'] = get_public_key(os.path.expanduser(args['--sender_pk']))
+
+        if args['--range']:
+            import re
+            r = re.compile(r'([\d]+)-([\d]+)?')
+            m = r.match(args['--range'])
+            if m is None:
+                raise ValueError(f"Invalid range: {args['--range']}")
+
+            start, end = m.groups()  # end might be None
+            start, end = int(start), (int(end) if end else None)
+            if end and start >= end:
+                raise ValueError(f"Invalid range: {args['--range']}")
+            kw['start_coordinate'] = start
+            kw['end_coordinate'] = end
+
         seckey = args['--sk'] or DEFAULT_SK
         if not seckey:
             raise ValueError('Secret key not specified')
@@ -57,9 +75,7 @@ def run(args):
         cb = partial(getpass, prompt='Passphrase for {}: '.format(os.path.basename(args["--sk"])))
         seckey = get_private_key(seckey, cb)
 
-        sender_pubkey = get_public_key(os.path.expanduser(args['--sender_pk'])) if args['--sender_pk'] else None
-
-        decrypt(seckey, sys.stdin.buffer, sys.stdout.buffer, sender_pubkey=sender_pubkey)
+        decrypt(seckey, sys.stdin.buffer, sys.stdout.buffer, **kw)
 
     #####################################
     ## For ReEncryption

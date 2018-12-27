@@ -17,7 +17,7 @@ Utility for the cryptographic GA4GH standard, reading from stdin and outputting 
 
 Usage:
    {PROG} [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path>
-   {PROG} [-hv] [--log <file>] decrypt [--sk <path>] [--sender_pk <path>]
+   {PROG} [-hv] [--log <file>] decrypt [--sk <path>] [--sender_pk <path>] [--range <start-end>]
    {PROG} [-hv] [--log <file>] reencrypt [--sk <path>] --recipient_pk <path> [--sender_public_key <path>]
    {PROG} [-hv] [--log <file>] generate [-f] [--pk <path>] [--sk <path>] [--nocrypt] [-C <comment>] [-R <rounds>]
 
@@ -34,6 +34,7 @@ Options:
                           Otherwise it is encrypted in the Crypt4GH key format
    -R <rounds>            Numbers of rounds for the key derivation. Ignore it to use the defaults.
    -f                     Overwrite the destination files
+   --range <start-end>    Byte-range either as  <start-end> or just <start>.
 
 Environment variables:
    C4GH_LOG         If defined, it will be used as the default logger

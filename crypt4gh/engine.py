@@ -10,10 +10,11 @@ import os
 import logging
 import hashlib
 from hmac import compare_digest
+import io
 
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
-from . import convert_error
+from . import convert_error, close_on_broken_pipe
 from .header import (parse as header_parse,
                      encrypt as header_encrypt,
                      decrypt as header_decrypt,
@@ -22,6 +23,7 @@ from .header import (parse as header_parse,
 LOG = logging.getLogger(__name__)
 
 SEGMENT_SIZE = 65536
+CIPHER_DIFF = 28
 
 # Checksum Algorithms Conventions
 # -------------------------------
@@ -121,6 +123,19 @@ def encrypt(seckey, recipient_pubkey, infile, outfile, checksum_algorithm=DEFAUL
 
     LOG.info('Encryption Successful')
 
+def _cipher_box(f, cipher):
+    CIPHER_SEGMENT_SIZE = SEGMENT_SIZE + CIPHER_DIFF
+    while True:
+        ciphersegment = f.read(CIPHER_SEGMENT_SIZE)
+        ciphersegment_len = len(ciphersegment)
+        if ciphersegment_len == 0: 
+            # We were at the last segment. Exits the loop
+            break
+        # Otherwise, decrypt
+        assert( ciphersegment_len > CIPHER_DIFF )
+        yield cipher.decrypt(ciphersegment[:12], ciphersegment[12:], None)  # No aad
+
+
 # The optional process_output allows us to decrypt and:
 # - dump the output to a file
 # - not process the output (only checksum it internally)
@@ -133,6 +148,13 @@ def body_decrypt(infile, checksum_algorithm, method, session_key, process_output
     LOG.debug("Checksum algorithm: %s", checksum_algorithm)
     LOG.debug(" Encryption Method: %s", method)
     LOG.debug("       Session Key: %s", session_key.hex())
+    LOG.debug("  Start Coordinate: %s", start_coordinate)
+    LOG.debug("    End Coordinate: %s", end_coordinate)
+
+    assert( isinstance(start_coordinate, int) and (end_coordinate is None or isinstance(end_coordinate, int)) )
+
+    has_range = (start_coordinate != 0 or
+               end_coordinate is not None)
 
     _raise_if_not_supported_method(method)
     LOG.info("Decrypting content")
@@ -140,58 +162,53 @@ def body_decrypt(infile, checksum_algorithm, method, session_key, process_output
     md = _get_checksum_algorithm(checksum_algorithm)
     LOG.debug("Preparing the checksum: %s", md)
 
-    if md and (start_coordinate != 0 or
-               end_coordinate is not None):
+    if md and has_range:
         LOG.debug("Requesting a range: Turning off the message digest")
         md = None
 
     cipher = ChaCha20Poly1305(session_key)
     do_process = callable(process_output)
 
-    buf = b'' # Last bytes of a segment, used for checksum
-    CIPHER_SEGMENT_SIZE = SEGMENT_SIZE + 28
-    while True:
-        
-        ciphersegment = infile.read(CIPHER_SEGMENT_SIZE)
-        ciphersegment_len = len(ciphersegment)
+    if has_range:
+        start_segment, start_offset = divmod(start_coordinate, SEGMENT_SIZE)
+        if start_segment: # not 0
+            start_ciphersegment = start_segment * (SEGMENT_SIZE + CIPHER_DIFF)
+            infile.seek(start_ciphersegment, io.SEEK_CUR)  # move forward
 
-        if ciphersegment_len == 0:
-            # We were at the last segment. Exits the loop
-            break
+        end_segment, end_offset = divmod(end_coordinate, SEGMENT_SIZE)
+        nb_segments = end_segment - start_segment
 
-        # Otherwise, decrypt
-        assert( ciphersegment_len > 28 )
-        segment = cipher.decrypt(ciphersegment[:12], ciphersegment[12:], None)  # No aad
-        segment_len = len(segment)
-        assert( segment_len > 0 )
+        LOG.debug('Start segment: %d | Offset: %d', start_segment, start_offset)
+        LOG.debug('  End segment: %d | Offset: %d', end_segment, end_offset)
+        LOG.debug(' # of segment: %d', nb_segments)
 
-        segment = buf + segment
+    mdbuf = b''
+    for i, segment in enumerate(_cipher_box(infile, cipher)):
         #LOG.debug("Segment: %s..%s", segment[:30], segment[-30:])
-        if segment_len == SEGMENT_SIZE:
-            # This is a full segment
-            if md:
-                # Remember the last bytes of the segment
-                buf = segment[-md.digest_size:]
-                segment = segment[:-md.digest_size]
-                md.update(segment)
-            if do_process:
-                process_output(segment)
+        if md:
+            # Remember the last bytes of the segment
+            segment = mdbuf + segment
+            assert( len(segment) >= md.digest_size )
+            mdbuf = segment[-md.digest_size:]
+            segment = segment[:-md.digest_size]
+            assert( len(segment) <= SEGMENT_SIZE )
+            md.update(segment)
 
-        else:
-            # This is the last segment
-            if md:
-                # Remember the last bytes of the segment
-                buf = segment[-md.digest_size:]
-                segment = segment[:-md.digest_size]
-                md.update(segment)
-            if do_process:
-                process_output(segment)
+        if has_range and i == 0:
+            segment = segment[start_offset:]
+        if has_range and i == nb_segments:
+            segment = segment[:end_offset]
 
+        if do_process:
+            process_output(segment)
+
+        if has_range and i == nb_segments:
             break
 
-    # Checksum compare
+    # Checksum compare (if no range)
     if md:
-        digest = buf[-md.digest_size:]
+        assert( len(mdbuf) == md.digest_size )
+        digest = mdbuf[-md.digest_size:]
         if not compare_digest(digest, md.digest()):
             LOG.debug('Computed MDC: %s', md.hexdigest().upper())
             LOG.debug('Original MDC: %s', digest.hex().upper())
@@ -202,6 +219,7 @@ def body_decrypt(infile, checksum_algorithm, method, session_key, process_output
     LOG.info('Decryption Successful')
 
     
+@close_on_broken_pipe
 def decrypt(seckey, infile, outfile, sender_pubkey=None, start_coordinate=0, end_coordinate=None):
     '''Decrypt infile into outfile, using seckey.
 

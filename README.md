@@ -1,8 +1,9 @@
+# Crypt4GH Encryption Utility
 
 `crypt4gh` is a tool to encrypt, decrypt or re-encrypt files
-according to the [GA4GH cryptographic standard](https://github.com/daviesrob/hts-specs/tree/crypt4gh_improved).
+according to the [Crypt4GH Encryption format](specs).
 
-# Installation
+## Installation
 
 ```
 git clone https://github.com/EGA-archive/crypt4gh
@@ -16,64 +17,63 @@ or
 pip install git+https://github.com/EGA-archive/crypt4gh.git
 ```
 
-# Usage
+## Usage
 
 The usual `-h` flag shows you the different options that the tool accepts.
 
 ```bash
 $ crypt4gh -h
-Utility for the cryptographic GA4GH standard.
-Reads from stdin and Outputs to stdout
+Utility for the cryptographic GA4GH standard, reading from stdin and outputting to stdout.
 
 Usage:
-   crypt4gh [-hv] [--log <file>] encrypt [--signing_key <file>] [--pk <path>]
-   crypt4gh [-hv] [--log <file>] decrypt [--sk <path>]
-   crypt4gh [-hv] [--log <file>] reencrypt [--signing_key <file>] [--sk <path>] [--pk <path>]
-   crypt4gh [-hv] [--log <file>] generate [-f <path>] [-P <passphrase>] [--signing]
+   crypt4gh [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path>
+   crypt4gh [-hv] [--log <file>] decrypt [--sk <path>] [--sender_pk <path>] [--range <start-end>]
+   crypt4gh [-hv] [--log <file>] reencrypt [--sk <path>] --recipient_pk <path> [--sender_public_key <path>]
+   crypt4gh [-hv] [--log <file>] generate [-f] [--pk <path>] [--sk <path>] [--nocrypt] [-C <comment>] [-R <rounds>]
 
 Options:
    -h, --help             Prints this help and exit
    -v, --version          Prints the version and exits
    --log <file>           Path to the logger file (in YML format)
-   --pk <keyfile>         Public Curve25519 key to be used for encryption
-   --sk <keyfile>         Private Curve25519 key to be used for decryption
-   --signing_key <file>   Ed25519 Signing key for the header
-   -f <path>              Private Curve25519 key (.pub is appended for the Public one) [default: ~/.c4gh/key]
-   -P <passphrase>        Passphrase to lock the secret key [default: None]
-   --signing              Generate an ed25519 signing/verifying keypair
+   --sk <keyfile>         Curve25519-based Private key [default: ~/.c4gh/key]
+   --pk <keyfile>         Curve25519-based Public key  [default: ~/.c4gh/key.pub]
+   --recipient_pk <path>  Recipient's Curve25519-based Public key
+   --sender_pk <path>     Peer's Curve25519-based Public key to verify provenance (aka, signature)
+   -C <comment>           Key's Comment
+   --nocrypt              Do not encrypt the private key.
+                          Otherwise it is encrypted in the Crypt4GH key format
+   -R <rounds>            Numbers of rounds for the key derivation. Ignore it to use the defaults.
+   -f                     Overwrite the destination files
+   --range <start-end>    Byte-range either as  <start-end> or just <start>.
 
 Environment variables:
    C4GH_LOG         If defined, it will be used as the default logger
-   C4GH_PUBLIC_KEY  If defined, it will be used as the default public key (ie --pk ${C4GH_PUBLIC_KEY})
    C4GH_SECRET_KEY  If defined, it will be used as the default secret key (ie --sk ${C4GH_SECRET_KEY})
-   C4GH_SIGNING_KEY If defined, it will be used as the default signing key (ie --signing_key ${C4GH_SIGNING_KEY})```
 ```
 
-# Examples
+## Demonstration
 
-If you want to encrypt a file:
+Alice and Bob generate both a pair of public/private keys.
 
 ```bash
-$ crypt4gh encrypt --pk path_to_pubkey < file > file.c4gh
+$ crypt4gh generate --sk alice.sec --pk alice.pub
+$ crypt4gh generate --sk bob.sec --pk bob.pub
 ```
 
-If you want to decrypt a file:
+Bob encrypts a file for Alice:
 
 ```bash
-$ crypt4gh decrypt --sk path_to_seckey < file.c4gh > file
+$ crypt4gh encrypt --sk bob.sec --recipient_pk alice.pub < file > file.c4gh
 ```
 
-# File Format
+Alice decrypts the encrypted file:
 
-Refer to the [following slide](https://docs.google.com/presentation/d/1Jg0cUCLBO7ctyIWiyTmxb5Il_fQVzKzrxHHzR0K9ZvU/edit#slide=id.g3b7e5ab607_0_2?usp=sharing)
+```bash
+$ crypt4gh decrypt --sk alice.sec < file.c4gh
+```
 
-# Demonstration
+[![asciicast](https://asciinema.org/a/JtctM4ATUBpGM3oQqbQ2Sr6B4.svg)](https://asciinema.org/a/JtctM4ATUBpGM3oQqbQ2Sr6B4)
 
-Here is a demo of the tool using the following scenario: We have pre-created 2 keypairs, namely `test.pub / test.sec` and `test2.pub / test2.sec`, and we run the steps:
+## File Format
 
-1. Encryption with a first public key, here `test.pub`
-2. Decryption with the relevant private key (Here the `test.sec`, where the passphrase is given at a no-echo prompt, to unlock it)
-3. Re-encryption with a second public key (Here `test2.pub` and the private key `test.sec` from 2)
-4. Decryption using the second private key `test2.sec` (along with the no-echo prompted passphrase to unlock it).
-
-[![asciicast](https://asciinema.org/a/ypkjaoDgQOGg2pILdFI4JlFGg.png)](https://asciinema.org/a/ypkjaoDgQOGg2pILdFI4JlFGg)
+Refer to the [specifications](docs/static/crypt4gh.pdf) or this [documentation](https://crypt4gh.readthedocs.io/en/latest/encryption.html).

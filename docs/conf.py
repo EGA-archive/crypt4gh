@@ -58,7 +58,7 @@ master_doc = 'index'
 current_year = str(datetime.date.today().year)
 
 # General information about the project.
-project = 'GA4GH cryptor'
+project = 'Crypt4GH'
 copyright = f'{current_year}, EGA System Developers'
 author = 'EGA System Developers'
 

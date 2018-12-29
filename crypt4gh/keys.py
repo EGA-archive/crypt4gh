@@ -12,6 +12,8 @@ import bcrypt
 from nacl.public import PrivateKey
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
+from . import exit_on_invalid_passphrase
+
 LOG = logging.getLogger(__name__)
 
 MAGIC_WORD = b'crypt4gh'
@@ -110,6 +112,7 @@ def generate(seckey, pubkey, callback=None, comment=None, rounds=100):
 ## Decoding
 #######################################################################
 
+@exit_on_invalid_passphrase
 def _parse_encrypted_key(stream, callback):
 
     if MAGIC_WORD != stream.read(8):

@@ -154,17 +154,13 @@ def body_decrypt(infile, checksum_algorithm, method, session_key, process_output
     assert( isinstance(start_coordinate, int) and (end_coordinate is None or isinstance(end_coordinate, int)) )
 
     has_range = (start_coordinate != 0 or
-               end_coordinate is not None)
-
+                 end_coordinate is not None)
+    
     _raise_if_not_supported_method(method)
     LOG.info("Decrypting content")
     
     md = _get_checksum_algorithm(checksum_algorithm)
     LOG.debug("Preparing the checksum: %s", md)
-
-    if md and has_range:
-        LOG.debug("Requesting a range: Turning off the message digest")
-        md = None
 
     cipher = ChaCha20Poly1305(session_key)
     do_process = callable(process_output)
@@ -174,13 +170,20 @@ def body_decrypt(infile, checksum_algorithm, method, session_key, process_output
         if start_segment: # not 0
             start_ciphersegment = start_segment * (SEGMENT_SIZE + CIPHER_DIFF)
             infile.seek(start_ciphersegment, io.SEEK_CUR)  # move forward
-
-        end_segment, end_offset = divmod(end_coordinate, SEGMENT_SIZE)
-        nb_segments = end_segment - start_segment
-
+            
+        nb_segments, end_segment, end_offset = None, None, None
+        if end_coordinate is not None:
+            end_segment, end_offset = divmod(end_coordinate, SEGMENT_SIZE)
+            if end_offset == 0:
+                end_segment -= 1
+                end_offset = SEGMENT_SIZE
+            nb_segments = end_segment - start_segment
+            if nb_segments == 0:
+                end_offset -= start_offset
+ 
         LOG.debug('Start segment: %d | Offset: %d', start_segment, start_offset)
-        LOG.debug('  End segment: %d | Offset: %d', end_segment, end_offset)
-        LOG.debug(' # of segment: %d', nb_segments)
+        LOG.debug('  End segment: %s | Offset: %s', end_segment, end_offset)
+        LOG.debug(' # of segment: %s', nb_segments)
 
     mdbuf = b''
     for i, segment in enumerate(_cipher_box(infile, cipher)):
@@ -194,7 +197,7 @@ def body_decrypt(infile, checksum_algorithm, method, session_key, process_output
             assert( len(segment) <= SEGMENT_SIZE )
             md.update(segment)
 
-        if has_range and i == 0:
+        if has_range and i == 0 and start_offset:
             segment = segment[start_offset:]
         if has_range and i == nb_segments:
             segment = segment[:end_offset]
@@ -206,7 +209,7 @@ def body_decrypt(infile, checksum_algorithm, method, session_key, process_output
             break
 
     # Checksum compare (if no range)
-    if md:
+    if md and not has_range:
         assert( len(mdbuf) == md.digest_size )
         digest = mdbuf[-md.digest_size:]
         if not compare_digest(digest, md.digest()):

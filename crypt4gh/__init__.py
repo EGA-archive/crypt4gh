@@ -12,6 +12,7 @@ __copyright__ = __title__ + ' @ CRG'
 
 PROG = 'crypt4gh'
 
+import sys
 import logging
 LOG = logging.getLogger(__name__)
 
@@ -20,8 +21,9 @@ LOG = logging.getLogger(__name__)
 ##    Decorator for Error Handling
 ##
 ##############################################################
-from nacl.exceptions import InvalidkeyError, BadSignatureError, CryptoError
 import errno
+from nacl.exceptions import InvalidkeyError, BadSignatureError, CryptoError
+from cryptography.exceptions import InvalidTag
 
 def convert_error(func):
     def wrapper(*args, **kwargs):
@@ -40,4 +42,13 @@ def close_on_broken_pipe(func):
             if e.errno == errno.EPIPE:
                 LOG.error('Closing on Broken Pipe')
             # raise ValueError(f'Crypt4GH Error: {e}') from e
+    return wrapper
+
+def exit_on_invalid_passphrase(func):
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except (InvalidTag) as e:
+            print('Invalid passphrase', file=sys.stderr)
+            sys.exit(2)
     return wrapper

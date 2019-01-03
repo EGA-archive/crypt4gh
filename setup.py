@@ -1,5 +1,10 @@
+import os
 from setuptools import setup
 from crypt4gh import __version__, __author__, __title__, __doc__ as lega_doc, __license__, PROG
+
+here = os.path.dirname(__file__)
+with open(os.path.join(here, 'requirements.txt')) as f:
+    packages = f.readlines()
 
 setup(name='crypt4gh',
       version=__version__,
@@ -19,11 +24,5 @@ setup(name='crypt4gh',
           ]
       },
       platforms = 'any',
-      install_requires=[
-          'cryptography',
-          'pyYaml',
-          'ed25519',
-          'pynacl',
-          'docopt',
-      ],
+      install_requires=packages,
 )

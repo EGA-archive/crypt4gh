@@ -1,11 +1,40 @@
-\usepackage[margin=1in]{geometry}
+%\usepackage[margin=1in]{geometry}
 \usepackage[pdfborder={0 0 0},hyperfootnotes=false]{hyperref}
-\usepackage{parskip}
+%\usepackage{parskip}
+\usepackage{amsmath}
+\usepackage{graphicx}
+
+%% -----------------------------------------------------------
+%% For Tikz
+%% -----------------------------------------------------------
+\usepackage[version=latest]{pgf}
+
+\usepackage{tikz}
+\usetikzlibrary{%
+  arrows,%
+  arrows.meta,%
+  calc,%
+  decorations.pathmorphing,%
+  chains,%
+  fit,%
+  shapes.geometric,%
+  shapes.misc,%
+  shapes.multipart,%
+  matrix,%
+  positioning,%
+  shadows,%
+  backgrounds,%
+  patterns%
+}
+
+
+%% -----------------------------------------------------------
+%% Commands
+%% -----------------------------------------------------------
+
 \newcommand{\mailtourl}[1]{\href{mailto:#1}{\tt #1}}
 \newcommand{\tagvalue}[1]{\tt #1}
 \newcommand{\tagregex}[1]{\tt #1}
-
-\usepackage{amsmath}
-
-
 \newcommand{\kw}[1]{\texttt{#1}}
+
+

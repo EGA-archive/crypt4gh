@@ -74,3 +74,12 @@ cleanall: cleantilde
 
 
 
+img: $(BUILD)/pic.pdf
+
+$(BUILD)/pic.tex: pic.tex
+	@echo "\documentclass[10pt]{article}\input{settings}\\\\begin{document}" > $@
+	@cat $^ >> $@
+	@echo "\\end{document}" >> $@
+
+$(BUILD)/pic.pdf: $(BUILD)/pic.tex
+	@pdflatex -interaction=errorstopmode -file-line-error -halt-on-error -output-directory=$(BUILD) $<

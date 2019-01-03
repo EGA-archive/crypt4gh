@@ -58,6 +58,14 @@ struct HeaderData {
 };
 \end{verbatim}
 
+\begin{figure}
+ \centering
+ \includegraphics[width=\textwidth]{sections/encryption.png}
+ \caption{Structure of the Header}
+ \label{figure:header:structure}
+\end{figure}
+
+
 \kw{header\_encryption\_method} is an enumerated type that describes how the \kw{encrypted\_header} is generated.
 
 The plaintext of the \kw{encrypted\_header} encodes, using the following type \kw{EncryptionParameters}, the parameters used for the encryption of the data portion.
@@ -109,11 +117,11 @@ select (checksum_algorithm) {
   };
 \end{verbatim}
 
-The following is an example of a header configuration:
-%
-\begin{verbatim}
-[magic number][version][header len][header enc. method][pubkey][nonce][enc. header][mac]
-\end{verbatim}
+% The following is an example of a header configuration:
+% %
+% \begin{verbatim}
+% [magic number][version][header len][header enc. method][pubkey][nonce][enc. header][mac]
+% \end{verbatim}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

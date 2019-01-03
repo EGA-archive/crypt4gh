@@ -10,7 +10,7 @@ A key is stored in the following PEM format:
     BASE64-ENCODED DATA
     -----END CRYPT4GH <type> KEY-----
 
-where ``type>`` is either PUBLIC, PRIVATE, or ENCRYPTED PRIVATE
+where ``<type>`` is either PUBLIC, PRIVATE, or ENCRYPTED PRIVATE
 
 For a non-encrypted key, whether a public key or a private key, the key data is the byte representation of the plaintext key material.
 
@@ -31,7 +31,7 @@ The ``MAGIC_WORD`` is the byte-representation of the ASCII word "crypt4gh".
 Everything ``string`` consists of a length n (encoded as 2 big-endian bytes) and a sequence of n bytes.
 For example, the ``string`` hello, is encoded as ``\x00\x05hello``.
 
-The ``kdfname`` is the name of the Key Derivation Function. We support either ``pbkdf2_hmac_sha256`` or ``bcrypt``. The python implementation uses bcrypt when generating keys.
+The ``kdfname`` is the name of the Key Derivation Function. We support either ``scrypt``, ``pbkdf2_hmac_sha256`` or ``bcrypt``. The python implementation uses bcrypt when generating keys.
 
 ``rounds`` is a 4 big-endian bytes representation of the number of iterations used in the KDF.
 

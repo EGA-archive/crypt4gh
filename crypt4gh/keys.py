@@ -6,8 +6,15 @@ import os
 import io
 import logging
 from base64 import b64decode, b64encode
-#from hashlib import pbkdf2_hmac
+from hashlib import pbkdf2_hmac
 import bcrypt
+try:
+    from hashlib import scrypt
+    with_scrypt = True
+except:
+    #import sys
+    #print('Warning: No support for scrypt', file=sys.stderr)
+    with_scrypt = False
 
 from nacl.public import PrivateKey
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
@@ -36,6 +43,8 @@ def _decode_string(stream):
 #######################################################################
 
 def _derive_key(alg, passphrase, salt, rounds):
+    if alg == b'scrypt':
+        return scrypt(passphrase, salt, 1<<14, 8, 1, dklen=32)
     if alg == b'bcrypt':
         return bcrypt.kdf(passphrase, salt=salt, desired_key_bytes=32, rounds=rounds)
     if alg == b'pbkdf2_hmac_sha256':
@@ -49,12 +58,19 @@ def retrieve_pubkey(private_key):
 #######################################################################
 ## Encoding
 #######################################################################
-# I choose bcrypt over pbkdf2_hmac_sha256
+# Ideally, scrypt is chosen over bcrypt or pbkdf2_hmac_sha256
+# But in case there is no support for it, we pick bcrypt
+_KDFS = {
+    b'scrypt': (16, None),
+    b'bcrypt': (16, 100),
+    b'pbkdf2_hmac_sha256': (16, 100000),
+}
 
 def _encode_encrypted_private_key(key, passphrase, comment, rounds):
-    kdfname = b'bcrypt'     # b'pbkdf2_hmac_sha256'
-    salt = os.urandom(16)   # os.urandom(16)
-    rounds = rounds or 100  # 100000
+    global _KDFS, with_scrypt
+    kdfname = b'scrypt' if with_scrypt else b'bcrypt'
+    saltsize, rounds = _KDFS[kdfname]
+    salt = os.urandom(saltsize)
     derived_key = _derive_key(kdfname, passphrase, salt, rounds)
     nonce = os.urandom(12)
     key_bytes = bytes(key)  # Uses RawEncoder
@@ -93,6 +109,7 @@ def generate(seckey, pubkey, callback=None, comment=None, rounds=100):
             pkey = _encode_encrypted_private_key(sk, passphrase.encode(), comment, rounds)
             LOG.debug('Encoded Private Key: %s', pkey.hex().upper())
         else:
+            import sys
             print(f'WARNING: The private key {seckey} is not encrypted', file=sys.stderr)
             pkey = bytes(sk)
             LOG.debug('Non-Encrypted Private Key: %s', pkey.hex().upper())

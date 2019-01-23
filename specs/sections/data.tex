@@ -47,7 +47,7 @@ struct Segment {
 };
 \end{verbatim}
 
-The encrypted data portion is composed of a sequence of segements of at most 65564 bytes. If a segment has a predecessor, the predecessor must be of size 65564 bytes. Note that the plaintext data encrypted in the last segment of the sequence might contain a checksum value of the unencrypted file content, as specified in the header.
+The encrypted data portion is composed of a sequence of segements of at most 65564 bytes. If a segment has a predecessor, the predecessor must be of size 65564 bytes.
 
 % ------------------------
 \subsection{Decryption}
@@ -72,11 +72,3 @@ $$\text{seg\_end} = \text{header\_len} + \text{floor}(Q/65536) * 65564$$
 Plaintext segments are concatenated to form the resulting output, granted that $P \mathbin{\%} 65536$ bytes are discarded from the beginning of the first segment, and only $Q \mathbin{\%} 65536$ bytes are retained from the last segment.
 
 Implementation details for ChaCha20-Poly1305 (ietf mode) are described in \cite{RFC8439}.
-
-% ------------------------
-\paragraph{Message digest over the unencrypted data}%
-Finally, recall that the plaintext header stipulates which checksum algorithm was used to compute the message digest over the unencrypted data. If the chosen algorithm was not \kw{none}, the bytes representing the checksum value are discarded from the end of the resulting output to the recover the plaintext data.
-% 
-Naturally, the checksum value is bitwise compared to a newly computated message digest over the plaintext data. An error MUST be reported if the values do not match.
-
-It is not possible to compare checksums when decrypting a given range of the file. It is only used when decrypting the entire file.

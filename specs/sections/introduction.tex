@@ -30,8 +30,6 @@ The encrypted data portion is the actual application data, described in Section~
 It is encrypted using a symmetric encryption algorithm, as specified in the header.
 % 
 The data is encrypted in 64 kilobytes segments. For each encrypted segment, a 12 bytes nonce is prepended and a 16 bytes MAC is appended.
-% 
-The encrypted data portion may include a checksum of the unencrypted data, if the checksum algorithm is listed in the header.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -77,15 +77,7 @@ enum EncryptionMethod<le_uint32> {
   chacha20_ietf_poly1305 = 0;
 };
 
-enum ChecksumAlgorithm<le_uint32> {
-  none = 0;
-  md5 = 1;
-  sha256 = 2;
-};
-
 struct EncryptionParameters {
-  enum ChecksumAlgorithm<le_uint32> checksum_algorithm;
-
   enum EncryptionMethod<le_uint32>  method;
   select (method) {
     case chacha20_ietf_poly1305:
@@ -100,22 +92,6 @@ struct EncryptionParameters {
 \kw{key} is a secret encryption key.
 %
 In the case of \kw{chacha20\_ietf\_poly1305}, it is a sequence of 32 bytes.
-
-% ---------------
-\kw{checksum\_algorithm} is an enumerated type that describes how the checksum over the \emph{unencryted} data content is computed.
-%
-If a checksum algorithm is chosen, `sha256' SHOULD be prefered and `md5' SHOULD only be used for backwards compatibility.
-%
-Moreover, the checksum value is of the following form and appended at the end of the encrypted data portion (see Section~\ref{data:encrypted}). Nothing is appended if \kw{checksum\_algorithm} is \kw{none}.
-%
-\begin{verbatim}
-select (checksum_algorithm) {
-  case md5:
-    byte       key[16];
-  case sha256:
-    byte       key[32];
-  };
-\end{verbatim}
 
 % The following is an example of a header configuration:
 % %

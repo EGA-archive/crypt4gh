@@ -59,10 +59,9 @@ def parse(stream):
 # else: NotImplemented / NotSupported
 
 
-def encrypt_X25519_Chacha20_Poly1305(algorithm_data, seckey, recipient_pubkey, encryption_method=0, checksum_algorithm=2):
+def encrypt_X25519_Chacha20_Poly1305(algorithm_data, seckey, recipient_pubkey, encryption_method=0):
     '''Computes the encrypted part'''
-    data = (checksum_algorithm.to_bytes(4, 'little') +  # 4 byte
-            encryption_method.to_bytes(4,'little')   +  # 4 bytes
+    data = (encryption_method.to_bytes(4,'little')   +  # 4 bytes
             algorithm_data)                             # See method data size
 
     pubkey = bytes(retrieve_pubkey(seckey))
@@ -89,14 +88,13 @@ def encrypt_X25519_Chacha20_Poly1305(algorithm_data, seckey, recipient_pubkey, e
     
     return serialize(header_data)
 
-def encrypt(algorithm_data, seckey, recipient_pubkey, encryption_method=0, checksum_algorithm=2, header_encryption_method=0):
+def encrypt(algorithm_data, seckey, recipient_pubkey, encryption_method=0, header_encryption_method=0):
     '''Computes the encrypted part'''
     if header_encryption_method == 0:
         return encrypt_X25519_Chacha20_Poly1305(algorithm_data,
                                                 seckey,
                                                 recipient_pubkey,
-                                                encryption_method=encryption_method,
-                                                checksum_algorithm=checksum_algorithm)
+                                                encryption_method=encryption_method)
     if method == 1:
         raise NotImplementedError('AES-256-GCM support is not implemented')
     raise ValueError('Unsupported Header Encryption Method')
@@ -118,7 +116,7 @@ def decrypt_X25519_Chacha20_Poly1305(encrypted_part, privkey, sender_pubkey=None
     LOG.debug('         nonce: %s', nonce.hex())
     LOG.debug('encrypted data: %s', algorithm_data.hex())
 
-    if len(algorithm_data) != 56: # 4+4+32 + tag
+    if len(algorithm_data) != 52: # 4+32 + tag
         raise ValueError('Invalid encrypted data length')
 
     # X25519 shared key
@@ -130,12 +128,11 @@ def decrypt_X25519_Chacha20_Poly1305(encrypted_part, privkey, sender_pubkey=None
     data = engine.decrypt(nonce, algorithm_data, None)  # No add
 
     #LOG.debug('Original data: %s', data.hex())
-    if len(data) != 40: # 4+4+32
+    if len(data) != 36: # 4+32
         raise ValueError('Invalid encrypted header part length')
-    checksum_algorithm = int.from_bytes(data[:4], byteorder='little')  # 4 bytes
-    method = int.from_bytes(data[4:8], byteorder='little')             # 4 bytes
+    method = int.from_bytes(data[:4], byteorder='little')             # 4 bytes
 
-    return (checksum_algorithm, method, data[8:])
+    return (method, data[4:])
 
 def decrypt(data, privkey, sender_pubkey=None):
     header_encryption_method = int.from_bytes(data[:4], byteorder='little')
@@ -149,6 +146,6 @@ def decrypt(data, privkey, sender_pubkey=None):
 def reencrypt(encrypted_part, privkey, recipient_pubkey, sender_pubkey=None):
     '''Re-encrypt the given header'''
     LOG.info(f'Reencrypting the header')
-    checksum_algorithm, method, algorithm_data = decrypt(encrypted_part, sender_pubkey=sender_pubkey)
+    method, algorithm_data = decrypt(encrypted_part, sender_pubkey=sender_pubkey)
     # New header
-    return encrypt(algorithm_data, privkey, recipient_pubkey, encryption_method=method, checksum_algorithm=checksum_algorithm)
+    return encrypt(algorithm_data, privkey, recipient_pubkey, encryption_method=method)

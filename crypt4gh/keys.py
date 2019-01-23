@@ -23,7 +23,7 @@ from . import exit_on_invalid_passphrase
 
 LOG = logging.getLogger(__name__)
 
-MAGIC_WORD = b'crypt4gh'
+MAGIC_WORD = b'c4gh-v1'
 
 #######################################################################
 ## Encoded strings
@@ -132,7 +132,7 @@ def generate(seckey, pubkey, callback=None, comment=None, rounds=100):
 @exit_on_invalid_passphrase
 def _parse_encrypted_key(stream, callback):
 
-    if MAGIC_WORD != stream.read(8):
+    if MAGIC_WORD != stream.read(len(MAGIC_WORD)):
         raise ValueError('Invalid key format')
 
     kdfname = _decode_string(stream)

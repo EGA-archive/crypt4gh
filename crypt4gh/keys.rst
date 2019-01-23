@@ -26,7 +26,7 @@ For an encryted key (especially for encrypted private keys), we use the followin
    string  comment
 
 
-The ``MAGIC_WORD`` is the byte-representation of the ASCII word "crypt4gh".
+The ``MAGIC_WORD`` is the byte-representation of the ASCII word "c4gh-v1".
 
 Everything ``string`` consists of a length n (encoded as 2 big-endian bytes) and a sequence of n bytes.
 For example, the ``string`` hello, is encoded as ``\x00\x05hello``.

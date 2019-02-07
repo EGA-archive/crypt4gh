@@ -5,7 +5,8 @@ import os
 import logging
 
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
-from nacl.bindings import crypto_box_beforenm as derive_shared_key
+#from nacl.bindings import crypto_box_beforenm as derive_shared_key
+from nacl.bindings import crypto_scalarmult as derive_shared_key
 
 from . import __version__
 from .keys import retrieve_pubkey

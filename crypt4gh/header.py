@@ -5,7 +5,7 @@ import os
 import logging
 
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
-from nacl.bindings import crypto_scalarmult as derive_shared_key
+from nacl.bindings import crypto_kx_client_session_keys, crypto_kx_server_session_keys
 
 from . import __version__
 from .keys import retrieve_pubkey
@@ -75,7 +75,7 @@ def encrypt_X25519_Chacha20_Poly1305(algorithm_data, seckey, recipient_pubkey, e
     header_encryption_method = 0
 
     # X25519 shared key
-    shared_key = derive_shared_key(seckey, recipient_pubkey)
+    _, shared_key = crypto_kx_server_session_keys(pubkey, seckey, recipient_pubkey)
     LOG.debug('shared key: %s', shared_key.hex())
 
     # Chacha20_Poly1305
@@ -120,7 +120,8 @@ def decrypt_X25519_Chacha20_Poly1305(encrypted_part, privkey, sender_pubkey=None
         raise ValueError('Invalid encrypted data length')
 
     # X25519 shared key
-    shared_key = derive_shared_key(privkey, peer_pubkey)
+    pubkey = bytes(retrieve_pubkey(privkey))  # slightly inefficient, but working
+    shared_key, _ = crypto_kx_client_session_keys(pubkey, privkey, peer_pubkey)
     LOG.debug('shared key: %s', shared_key.hex())
 
     # Chacha20_Poly1305

@@ -110,7 +110,7 @@ def generate(seckey, pubkey, callback=None, comment=None, rounds=100):
             LOG.debug('Encoded Private Key: %s', pkey.hex().upper())
         else:
             import sys
-            print(f'WARNING: The private key {seckey} is not encrypted', file=sys.stderr)
+            LOG.warning(f'WARNING: The private key {seckey} is not encrypted', file=sys.stderr)
             pkey = bytes(sk)
             LOG.debug('Non-Encrypted Private Key: %s', pkey.hex().upper())
 

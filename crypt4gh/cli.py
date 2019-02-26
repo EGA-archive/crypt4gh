@@ -16,9 +16,9 @@ __doc__ = f'''
 Utility for the cryptographic GA4GH standard, reading from stdin and outputting to stdout.
 
 Usage:
-   {PROG} [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path>
-   {PROG} [-hv] [--log <file>] decrypt [--sk <path>] [--sender_pk <path>] [--range <start-end>]
-   {PROG} [-hv] [--log <file>] reencrypt [--sk <path>] --recipient_pk <path> [--sender_public_key <path>]
+   {PROG} [-hv] [--log <file>] encrypt (--sk <path> | --kms_secret_id <id>) --recipient_pk <path>
+   {PROG} [-hv] [--log <file>] decrypt (--sk <path> | --kms_secret_id <id>) [--sender_pk <path>] [--range <start-end>]
+   {PROG} [-hv] [--log <file>] reencrypt (--sk <path> | --kms_secret_id <id>) --recipient_pk <path> [--sender_public_key <path>]
    {PROG} [-hv] [--log <file>] generate [-f] [--pk <path>] [--sk <path>] [--nocrypt] [-C <comment>] [-R <rounds>]
 
 Options:
@@ -27,6 +27,7 @@ Options:
    --log <file>           Path to the logger file (in YML format)
    --sk <keyfile>         Curve25519-based Private key [default: ~/.c4gh/key]
    --pk <keyfile>         Curve25519-based Public key  [default: ~/.c4gh/key.pub]
+   --kms_secret_id <id>   ID of secret key stored in AWS parameter store
    --recipient_pk <path>  Recipient's Curve25519-based Public key
    --sender_pk <path>     Peer's Curve25519-based Public key to verify provenance (aka, signature)
    -C <comment>           Key's Comment
@@ -61,5 +62,5 @@ def parse_args(argv=sys.argv[1:]):
     for s in ['--log', '--help', '--version']:#, 'help', 'version']:
         del args[s]
 
-    # print(args)
+   #  print(args)
     return args

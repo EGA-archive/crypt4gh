@@ -27,9 +27,9 @@ def run(args):
     ## Retrieve private key
     ##################################### 
     if args['encrypt'] or args['decrypt'] or args['reencrypt']:
-        if args['--kms_secret_id']:
+        if args['--ssm_secret_id']:
             with open("pk.pem", 'w') as f: 
-                f.write(get_parameter(args['--kms_secret_id']))
+                f.write(get_parameter(args['--ssm_secret_id']))
             seckey = tmp_pk_file
             cb = partial(getpass, prompt='Passphrase for {}: '.format(os.path.basename(args["--kms_secret_id"])))
         else:

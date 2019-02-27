@@ -50,6 +50,6 @@ def exit_on_invalid_passphrase(func):
             return func(*args, **kwargs)
         except (InvalidTag) as e:
             LOG.error('Exiting for %r', e)
-            LOG.error('Invalid Key or Passphrase', file=sys.stderr)
+            print('Invalid Key or Passphrase', file=sys.stderr)
             sys.exit(2)
     return wrapper

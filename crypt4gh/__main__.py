@@ -104,7 +104,7 @@ def run(args):
                 if os.path.isfile(k):
                     yn = input(f'{k} already exists. Do you want to overwrite it? (y/n) ')
                     if yn != 'y':
-                        LOG.error('Ok. Fair enough. Exiting.')
+                        print('Ok. Fair enough. Exiting.')
                         sys.exit(0)
                 
         do_crypt = not args['--nocrypt']

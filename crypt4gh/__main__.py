@@ -130,4 +130,5 @@ def main(args=sys.argv[1:]):
     #     sys.exit(1)
 
 if __name__ == '__main__':
+    assert sys.version_info >= (3, 6), "This tool requires python3.6"
     main()

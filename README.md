@@ -5,6 +5,8 @@ according to the [Crypt4GH Encryption format](specs).
 
 ## Installation
 
+Python `3.6+` required to use the crypt4gh encryption utility.
+
 ```
 git clone https://github.com/EGA-archive/crypt4gh
 pip install -r crypt4gh/requirements.txt

@@ -7,7 +7,7 @@ import sys
 Handy dandy utilities for dealing with AWS resources
 """
 
-log = logging.getLogger(__name__)
+LOG = logging.getLogger(__name__)
 
 def get_parameter(param_name):
     """
@@ -29,8 +29,8 @@ def get_parameter(param_name):
     )
     
     if len(response['Parameters']) == 0:
-        log.critical("AWS SSM parameter %s not found." % param_name)
-        log.critical("Please check the name of the key is correct and the credentials in your environment have appropriate authorisation.")
+        LOG.critical("AWS SSM parameter %s not found." % param_name)
+        LOG.critical("Please check the name of the key is correct and the credentials in your environment have appropriate authorisation.")
         sys.exit(1)
 
     credentials = response['Parameters'][0]['Value']

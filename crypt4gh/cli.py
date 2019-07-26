@@ -18,7 +18,7 @@ Utility for the cryptographic GA4GH standard, reading from stdin and outputting 
 Usage:
    {PROG} [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path>
    {PROG} [-hv] [--log <file>] decrypt [--sk <path>] [--sender_pk <path>] [--range <start-end>]
-   {PROG} [-hv] [--log <file>] reencrypt [--sk <path>] --recipient_pk <path> [--sender_public_key <path>]
+   {PROG} [-hv] [--log <file>] reencrypt [--sk <path>] --recipient_pk <path> [--sender_public_key <path>] [--keep_ignored]
    {PROG} [-hv] [--log <file>] generate [-f] [--pk <path>] [--sk <path>] [--nocrypt] [-C <comment>] [-R <rounds>]
 
 Options:
@@ -35,6 +35,8 @@ Options:
    -R <rounds>            Numbers of rounds for the key derivation. Ignore it to use the defaults.
    -f                     Overwrite the destination files
    --range <start-end>    Byte-range either as  <start-end> or just <start>.
+   -k, --keep_ignored     Keep non-understood header packets when reencrypting
+
 
 Environment variables:
    C4GH_LOG         If defined, it will be used as the default logger
@@ -55,7 +57,7 @@ def parse_args(argv=sys.argv[1:]):
     if logger and os.path.exists(logger):
         with open(logger, 'rt') as stream:
             import yaml
-            logging.config.dictConfig(yaml.load(stream))
+            logging.config.dictConfig(yaml.safe_load(stream))
 
     # I prefer to clean up
     for s in ['--log', '--help', '--version']:#, 'help', 'version']:

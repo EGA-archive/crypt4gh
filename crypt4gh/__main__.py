@@ -41,17 +41,18 @@ def run(args):
             raise ValueError("Recipient's Public Key not found")
         recipient_pubkey = get_public_key(recipient_pubkey)
             
-        encrypt(seckey, recipient_pubkey, sys.stdin.buffer, sys.stdout.buffer)
+        encrypt([(0, seckey, recipient_pubkey)],
+                sys.stdin.buffer,
+                sys.stdout.buffer)
     
     #####################################
     ## For Decryption
     ##################################### 
     if args['decrypt']:
 
-        kw = {}
-        if args['--sender_pk']:
-            kw['sender_pubkey'] = get_public_key(os.path.expanduser(args['--sender_pk']))
+        sender_pubkey = get_public_key(os.path.expanduser(args['--sender_pk'])) if args['--sender_pk'] else None
 
+        kw = {}
         if args['--range']:
             import re
             r = re.compile(r'([\d]+)-([\d]+)?')
@@ -75,7 +76,10 @@ def run(args):
         cb = partial(getpass, prompt='Passphrase for {}: '.format(os.path.basename(args["--sk"])))
         seckey = get_private_key(seckey, cb)
 
-        decrypt(seckey, sys.stdin.buffer, sys.stdout.buffer, **kw)
+        decrypt([(0, seckey, sender_pubkey)], # keys = list of (method, privkey, sender_pubkey=None)
+                sys.stdin.buffer,
+                sys.stdout.buffer,
+                **kw)
 
     #####################################
     ## For ReEncryption
@@ -94,8 +98,11 @@ def run(args):
         recipient_pubkey = get_public_key(os.path.expanduser(args['--recipient_pk']))
         sender_pubkey = get_public_key(os.path.expanduser(args['--sender_pk'])) if args['--sender_pk'] else None
 
-        reencrypt(seckey, recipient_pubkey, sys.stdin.buffer, sys.stdout.buffer, sender_pubkey=sender_pubkey)
-
+        reencrypt([(0, seckey, sender_pubkey)], # recipient_keys
+                  [(0, seckey, recipient_pubkey)], # recipient_keys
+                  sys.stdin.buffer, sys.stdout.buffer,
+                  keep_ignored=args['--keep_ignored'])
+        
     #####################################
     ## For Keys Generation
     #####################################

@@ -51,9 +51,6 @@ def _derive_key(alg, passphrase, salt, rounds):
         return pbkdf2_hmac('sha256', passphrase, salt, rounds, dklen=32)
     raise NotImplementedError(f'Unsupported KDF: {alg}')
 
-def retrieve_pubkey(private_key):
-    '''Get public key from private key'''
-    return PrivateKey(private_key).public_key
 
 #######################################################################
 ## Encoding

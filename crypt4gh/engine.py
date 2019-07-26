@@ -13,9 +13,11 @@ from hmac import compare_digest
 import io
 
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
+from cryptography.exceptions import InvalidTag
 
 from . import convert_error, close_on_broken_pipe
 from .header import (parse as header_parse,
+                     serialize as header_serialize,
                      encrypt as header_encrypt,
                      decrypt as header_decrypt,
                      reencrypt as header_reencrypt)
@@ -32,13 +34,6 @@ CIPHER_DIFF = 28
 # 1: AES-256-CTR => Not Implemented
 # else: NotSupported
 
-def _raise_if_not_supported_method(method):
-    if method == 0:
-        return
-    if method == 1:
-        raise NotImplementedError('AES support is not implemented')
-    raise ValueError('Unsupported encryption method')
-
 
 ##############################################################
 ##
@@ -46,23 +41,27 @@ def _raise_if_not_supported_method(method):
 ##
 ##############################################################
 
-def _encrypt_segment(data, outfile, session_key):
+def _encrypt_segment(data, process, cipher):
     '''Utility function to generate a nonce, encrypt data with Chacha20, and authenticate it with Poly1305.'''
     #LOG.debug("Segment: %s..%s", data[:30], data[-30:])
 
-    cipher = ChaCha20Poly1305(session_key)
     nonce = os.urandom(12)
     encrypted_data = cipher.encrypt(nonce, data, None)  # No add
-    outfile.write(nonce)
-    outfile.write(encrypted_data)
+    process(nonce)
+    process(encrypted_data)
 
-def encrypt(seckey, recipient_pubkey, infile, outfile):
-    '''Encrypt infile into outfile, using seckey and recipient_pubkey.'''
+def encrypt(keys, infile, outfile):
+    '''Encrypt infile into outfile, using the list of keys.'''
     LOG.info('Encrypting the file')
-    session_key = os.urandom(32)
+
+    encryption_method = 0 # only choice for this version
+    session_key = os.urandom(32) # we use one session key for all blocks
+    cipher = ChaCha20Poly1305(session_key) # create a new one in case an old one is not reset
 
     LOG.debug('Creating Crypt4GH header')
-    header_bytes = header_encrypt(session_key, seckey, recipient_pubkey)
+    header_content = encryption_method.to_bytes(4,'little') + session_key
+    header_packets = header_encrypt(header_content, keys)
+    header_bytes = header_serialize(header_packets)
     outfile.write(header_bytes)
 
     LOG.debug("Streaming content")
@@ -72,16 +71,23 @@ def encrypt(seckey, recipient_pubkey, infile, outfile):
     segment_len = infile.readinto(segment)
     while segment_len == SEGMENT_SIZE:
         data = bytes(segment)
-        _encrypt_segment(data, outfile, session_key)
+        _encrypt_segment(data, outfile.write, cipher)
         segment_len = infile.readinto(segment)
 
     # We reached the last segment
     data = bytes(segment[:segment_len]) # to discard the bytes from the previous segments
-    _encrypt_segment(data, outfile, session_key)
+    _encrypt_segment(data, outfile.write, cipher)
 
     LOG.info('Encryption Successful')
 
-def _cipher_box(f, cipher):
+
+##############################################################
+##
+##    Symmetric decryption - Chacha20_Poly1305
+##
+##############################################################
+
+def _cipher_box(f, ciphers):
     CIPHER_SEGMENT_SIZE = SEGMENT_SIZE + CIPHER_DIFF
     while True:
         ciphersegment = f.read(CIPHER_SEGMENT_SIZE)
@@ -91,7 +97,19 @@ def _cipher_box(f, cipher):
             break
         # Otherwise, decrypt
         assert( ciphersegment_len > CIPHER_DIFF )
-        yield cipher.decrypt(ciphersegment[:12], ciphersegment[12:], None)  # No aad
+        nonce = ciphersegment[:12]
+        data = ciphersegment[12:]
+        # Trying the different session keys (via the cipher objects)
+        # Note: we could order them and if one fails, we move it at the end of the list
+        # So... LRU solution. For now, try them as they come.
+        for cipher in ciphers:
+            try:
+                yield cipher.decrypt(nonce, data, None)  # No aad
+                break # only break the forloop
+            except InvalidTag as tag:
+                LOG.error('Decryption failed: %s', tag)
+        else: # no cipher worked: Bark!
+            raise ValueError('Could not decrypt that block')
 
 
 # The optional process_output allows us to decrypt and:
@@ -100,11 +118,9 @@ def _cipher_box(f, cipher):
 # - send it (in mem) to another quality control pass
 
 @convert_error
-def body_decrypt(infile, method, session_key, process_output=None, start_coordinate=0, end_coordinate=None):
+def body_decrypt(ciphers, infile, process_output=None, start_coordinate=0, end_coordinate=None):
     '''Decrypting the data section and verifying its checksum'''
 
-    LOG.debug(" Encryption Method: %s", method)
-    LOG.debug("       Session Key: %s", session_key.hex())
     LOG.debug("  Start Coordinate: %s", start_coordinate)
     LOG.debug("    End Coordinate: %s", end_coordinate)
 
@@ -113,12 +129,11 @@ def body_decrypt(infile, method, session_key, process_output=None, start_coordin
     has_range = (start_coordinate != 0 or
                  end_coordinate is not None)
     
-    _raise_if_not_supported_method(method)
     LOG.info("Decrypting content")
-    
-    cipher = ChaCha20Poly1305(session_key)
+
     do_process = callable(process_output)
 
+    # Dealing with the range
     if has_range:
         start_segment, start_offset = divmod(start_coordinate, SEGMENT_SIZE)
         if start_segment: # not 0
@@ -139,7 +154,8 @@ def body_decrypt(infile, method, session_key, process_output=None, start_coordin
         LOG.debug('  End segment: %s | Offset: %s', end_segment, end_offset)
         LOG.debug(' # of segment: %s', nb_segments)
 
-    for i, segment in enumerate(_cipher_box(infile, cipher)):
+    # Decryption
+    for i, segment in enumerate(_cipher_box(infile, ciphers)):
         #LOG.debug("Segment: %s..%s", segment[:30], segment[-30:])
         if has_range and i == 0 and start_offset:
             segment = segment[start_offset:]
@@ -156,32 +172,57 @@ def body_decrypt(infile, method, session_key, process_output=None, start_coordin
 
     
 @close_on_broken_pipe
-def decrypt(seckey, infile, outfile, sender_pubkey=None, start_coordinate=0, end_coordinate=None):
-    '''Decrypt infile into outfile, using seckey.
+def decrypt(keys, infile, outfile, start_coordinate=0, end_coordinate=None):
+    '''Decrypt infile into outfile, using a given set of keys.
 
     If sender_pubkey is specified, it verifies the provenance of the header
     '''
     LOG.info('Decrypting file')
-    header_data = header_parse(infile)
-    #LOG.debug('Header is the header\n %s', header)
-    method, session_key = header_decrypt(header_data, seckey, sender_pubkey=sender_pubkey)
-    # Decrypt the rest
-    return body_decrypt(infile,
-                        method,
-                        session_key,
+    header_packets = header_parse(infile)
+    session_keys, _ = header_decrypt(header_packets, keys)
+
+    # Filter out the unsupported methods
+    # They should be a stream (0000, session_key)
+    # Bark is anyone is malformed
+    def make_ciphers():
+        for session_key in session_keys:
+            encryption_method = int.from_bytes(session_key[:4], byteorder='little')
+            LOG.debug('Encryption Method: %d', encryption_method)
+            if encryption_method != 0:
+                LOG.warning('Unsupported bulk encryption method: %d', encryption_method)
+                continue
+            LOG.debug('Session key: %s', session_key[4:])
+            yield ChaCha20Poly1305(session_key[4:])
+
+    ciphers = list(make_ciphers())
+    if not ciphers:
+        raise InvalidTag('No supported encryption method')
+    
+    return body_decrypt(ciphers,
+                        infile,
                         process_output=outfile.write,
                         start_coordinate=start_coordinate,
                         end_coordinate=end_coordinate)
 
 
-def reencrypt(seckey, recipient_pubkey, infile, outfile, sender_pubkey=None, chunk_size=4096):
-    '''Extract header from infile and generetes another one to outfile. The encrypted data section is only copied from infile to outfile.'''
+##############################################################
+##
+##    Just reencryption of the header
+##
+##############################################################
 
-    header_data = header_parse(infile)
-    header = header_reencrypt(header_data, seckey, recipient_pubkey, sender_pubkey=None)
-    outfile.write(header)
 
-    LOG.info(f'Streaming the remainer of the file')
+def reencrypt(keys, recipient_keys, infile, outfile, chunk_size=4096, keep_ignored=False):
+    '''Extract header packets from infile and generate another one to outfile.
+    The encrypted data section is only copied from infile to outfile.'''
+
+    # Decrypt and re-encrypt the header
+    header_packets = header_parse(infile)
+    packets = header_reencrypt(header_packets, keys, recipient_keys, keep_ignored=keep_ignored)
+    outfile.write(header_serialize(packets))
+
+    # Stream the remainder
+    LOG.info(f'Streaming the remainder of the file')
     while True:
         data = infile.read(chunk_size)
         if not data:

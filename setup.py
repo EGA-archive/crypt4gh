@@ -25,6 +25,7 @@ setup(name='crypt4gh',
       entry_points={
           'console_scripts': [
               '{crypt4gh}=crypt4gh.__main__:main'.format(crypt4gh=PROG),
+              '{crypt4gh}-keygen=crypt4gh.keys:main'.format(crypt4gh=PROG),
           ]
       },
       platforms = 'any',

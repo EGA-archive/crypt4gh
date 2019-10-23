@@ -4,38 +4,50 @@ import sys
 import os
 import logging
 import logging.config
+from functools import partial
+from getpass import getpass
+import re
 
 from docopt import docopt
 
 from . import __title__, __version__, PROG
+from . import engine
+from .keys import get_public_key, get_private_key
 
+LOG = logging.getLogger(__name__)
+
+DEFAULT_SK  = os.getenv('C4GH_SECRET_KEY', '~/.c4gh/key')
 DEFAULT_LOG = os.getenv('C4GH_LOG', None)
+
+# We make the following choices for this utility.
+# Even though the library can encrypt/decrypt/reencrypt for multiple user, using multiple session keys,
+# the command-line options allowed only one recipient (ie --recipient_sk can not be repeated)
+# and only one writer/sender.
+# This simplifies the code
+#
+# Moreover, we do separate 'rearrange' from 'reencrypt', to make it simpler.
+# If you want to combine them, pipe one into the other.
+
 
 __doc__ = f'''
 
 Utility for the cryptographic GA4GH standard, reading from stdin and outputting to stdout.
 
 Usage:
-   {PROG} [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path>
+   {PROG} [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path> [--range <start-end>]
    {PROG} [-hv] [--log <file>] decrypt [--sk <path>] [--sender_pk <path>] [--range <start-end>]
-   {PROG} [-hv] [--log <file>] reencrypt [--sk <path>] --recipient_pk <path> [--sender_public_key <path>] [--keep_ignored]
-   {PROG} [-hv] [--log <file>] generate [-f] [--pk <path>] [--sk <path>] [--nocrypt] [-C <comment>] [-R <rounds>]
+   {PROG} [-hv] [--log <file>] rearrange [--sk <path>] --range <start-end>
+   {PROG} [-hv] [--log <file>] reencrypt [--sk <path>] --recipient_pk <path> [--sender_public_key <path>] [--trim]
 
 Options:
    -h, --help             Prints this help and exit
    -v, --version          Prints the version and exits
    --log <file>           Path to the logger file (in YML format)
-   --sk <keyfile>         Curve25519-based Private key [default: ~/.c4gh/key]
-   --pk <keyfile>         Curve25519-based Public key  [default: ~/.c4gh/key.pub]
+   --sk <keyfile>         Curve25519-based Private key [default: {DEFAULT_SK}]
    --recipient_pk <path>  Recipient's Curve25519-based Public key
    --sender_pk <path>     Peer's Curve25519-based Public key to verify provenance (aka, signature)
-   -C <comment>           Key's Comment
-   --nocrypt              Do not encrypt the private key.
-                          Otherwise it is encrypted in the Crypt4GH key format
-   -R <rounds>            Numbers of rounds for the key derivation. Ignore it to use the defaults.
-   -f                     Overwrite the destination files
-   --range <start-end>    Byte-range either as  <start-end> or just <start>.
-   -k, --keep_ignored     Keep non-understood header packets when reencrypting
+   --range <start-end>    Byte-range either as  <start-end> or just <start>
+   -t, --trim             Keep only header packets that you can decrypt
 
 
 Environment variables:
@@ -43,6 +55,7 @@ Environment variables:
    C4GH_SECRET_KEY  If defined, it will be used as the default secret key (ie --sk ${{C4GH_SECRET_KEY}})
 
 '''
+
 
 def parse_args(argv=sys.argv[1:]):
 
@@ -65,3 +78,107 @@ def parse_args(argv=sys.argv[1:]):
 
     # print(args)
     return args
+
+
+range_re = re.compile(r'([\d]+)-([\d]+)?')
+
+def parse_range(args):
+    r = args['--range']
+    if not r:
+        return (0, None)
+
+    m = range_re.match(r)
+    if m is None:
+        raise ValueError(f"Invalid range: {args['--range']}")
+    
+    start, end = m.groups()  # end might be None
+    start, end = int(start), (int(end) if end else None)
+    if end and start >= end:
+        raise ValueError(f"Invalid range: {args['--range']}")
+    return (start, end)
+
+def encrypt(args):
+    assert( args['encrypt'] )
+
+    range_start, range_end = parse_range(args)
+
+    recipient_pubkey = os.path.expanduser(args['--recipient_pk'])
+    if not os.path.exists(recipient_pubkey):
+        raise ValueError("Recipient's Public Key not found")
+    recipient_pubkey = get_public_key(recipient_pubkey)
+
+
+    seckey = args['--sk'] or DEFAULT_SK
+    seckeypath = os.path.expanduser(seckey)
+    if not os.path.exists(seckeypath):
+        raise ValueError('Secret key not found')
+
+    passphrase = os.getenv('C4GH_PASSPHRASE')
+    if passphrase:
+        LOG.warning("Using a passphrase in an environment variable is insecure")
+        cb = lambda : passphrase
+    else:
+        cb = partial(getpass, prompt=f'Passphrase for {seckey}: ')
+
+    seckey = get_private_key(seckeypath, cb)
+    keys = [(0, seckey, recipient_pubkey)] # keys = list of (method, privkey, sender_pubkey=None)
+
+    engine.encrypt(keys,
+                   sys.stdin.buffer,
+                   sys.stdout.buffer,
+                   start_coordinate = range_start,
+                   end_coordinate = range_end)
+
+
+def decrypt(args):
+    assert( args['decrypt'] )
+
+    sender_pubkey = get_public_key(os.path.expanduser(args['--sender_pk'])) if args['--sender_pk'] else None
+
+    range_start, range_end = parse_range(args)
+
+    seckey = args['--sk'] or DEFAULT_SK
+    seckeypath = os.path.expanduser(seckey)
+    if not os.path.exists(seckeypath):
+        raise ValueError('Secret key not found')
+
+    passphrase = os.getenv('C4GH_PASSPHRASE')
+    if passphrase:
+        LOG.warning("Using a passphrase in an environment variable is insecure")
+        cb = lambda : passphrase
+    else:
+        cb = partial(getpass, prompt=f'Passphrase for {seckey}: ')
+
+    seckey = get_private_key(seckeypath, cb)
+    keys = [(0, seckey, sender_pubkey)] # keys = list of (method, privkey, sender_pubkey=None)
+
+    engine.decrypt(keys, # list of (method, privkey, sender_pubkey=None)
+                   sys.stdin.buffer,
+                   sys.stdout.buffer,
+                   start_coordinate = range_start,
+                   end_coordinate = range_end)
+
+
+def rearrange(args):
+    assert( args['rearrange'] )
+    raise NotImplementedError()
+
+def reencrypt(args):
+    assert( args['reencrypt'] )
+
+    seckey = args['--sk'] or DEFAULT_SK
+    if not seckey:
+        raise ValueError('Secret key not specified')
+    seckey = os.path.expanduser(seckey)
+    if not os.path.exists(seckey):
+        raise ValueError('Secret key not found')
+    cb = partial(getpass, prompt=f'Passphrase for {args["--sk"]}: ')
+    seckey = get_private_key(seckey, cb)
+
+    recipient_pubkey = get_public_key(os.path.expanduser(args['--recipient_pk']))
+    sender_pubkey = get_public_key(os.path.expanduser(args['--sender_pk'])) if args['--sender_pk'] else None
+
+    engine.reencrypt([(0, seckey, sender_pubkey)], # recipient_keys
+                     [(0, seckey, recipient_pubkey)], # recipient_keys
+                     sys.stdin.buffer, sys.stdout.buffer,
+                     trim=args['--trim'])

@@ -16,16 +16,13 @@ from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 from cryptography.exceptions import InvalidTag
 
 from . import convert_error, close_on_broken_pipe
-from .header import (parse as header_parse,
-                     serialize as header_serialize,
-                     encrypt as header_encrypt,
-                     decrypt as header_decrypt,
-                     reencrypt as header_reencrypt)
+from . import header
 
 LOG = logging.getLogger(__name__)
 
 SEGMENT_SIZE = 65536
 CIPHER_DIFF = 28
+
 
 # Encryption Methods Conventions
 # ------------------------------
@@ -47,34 +44,75 @@ def _encrypt_segment(data, process, cipher):
 
     nonce = os.urandom(12)
     encrypted_data = cipher.encrypt(nonce, data, None)  # No add
-    process(nonce)
+    process(nonce) # after producing the segment, so we don't start outputing when an error occurs
     process(encrypted_data)
 
-def encrypt(keys, infile, outfile):
+
+# The encryption will not produce an edit list packet.
+# It'll fast-forward the file to the given position and only encrypt until the end_coodinate or the EOF
+def encrypt(keys, infile, outfile, start_coordinate=0, end_coordinate=None):
     '''Encrypt infile into outfile, using the list of keys.'''
+
     LOG.info('Encrypting the file')
 
+
+    # Forward to start position
+    LOG.debug("  Start Coordinate: %s", start_coordinate)
+    try:
+        start_coordinate = int(start_coordinate)
+        if start_coordinate < 0:
+            start_coordinate = 0
+            LOG.error('Invalid start coordinate. Using 0 instead')
+    except Exception as e:
+        LOG.error("Conversion error: %s", e)
+        start_coordinate = 0
+
+    if start_coordinate:
+        LOG.info("Forwarding to position: %s", start_coordinate)
+        infile.seek(start_coordinate, io.SEEK_SET)
+
+    # Where to stop
+    if (end_coordinate is not None
+        and not isinstance(end_coordinate, int)
+        and end_coordinate > start_coordinate):
+        LOG.error("    End Coordinate: %s | Converting to None", end_coordinate)
+        end_coordinate = None
+    max_length = end_coordinate - start_coordinate if end_coordinate else None
+
+    # Preparing the encryption engine
     encryption_method = 0 # only choice for this version
     session_key = os.urandom(32) # we use one session key for all blocks
     cipher = ChaCha20Poly1305(session_key) # create a new one in case an old one is not reset
 
+    # Output the header
     LOG.debug('Creating Crypt4GH header')
-    header_content = encryption_method.to_bytes(4,'little') + session_key
-    header_packets = header_encrypt(header_content, keys)
-    header_bytes = header_serialize(header_packets)
+    header_content = header.make_packet_data_enc(encryption_method, session_key)
+    header_packets = header.encrypt(header_content, keys)
+    header_bytes = header.serialize(header_packets)
     outfile.write(header_bytes)
 
+    # ...and cue music
     LOG.debug("Streaming content")
     # Boy... I buffer a whole segment!
     # TODO: Use a smaller buffer (Requires code rewrite)
     segment = bytearray(SEGMENT_SIZE)
-    segment_len = infile.readinto(segment)
-    while segment_len == SEGMENT_SIZE:
-        data = bytes(segment)
-        _encrypt_segment(data, outfile.write, cipher)
+
+    while True:
+
         segment_len = infile.readinto(segment)
 
-    # We reached the last segment
+        if max_length and max_length <= segment_len: # stop early
+            segment_len = max_length
+            break
+
+        if segment_len < SEGMENT_SIZE: # not a full segment
+            break
+
+        data = bytes(segment) # this is a full segment
+        _encrypt_segment(data, outfile.write, cipher)
+        max_length -= segment_len
+    
+    # We reached the last segment and the max_length
     data = bytes(segment[:segment_len]) # to discard the bytes from the previous segments
     _encrypt_segment(data, outfile.write, cipher)
 
@@ -118,7 +156,7 @@ def _cipher_box(f, ciphers):
 # - send it (in mem) to another quality control pass
 
 @convert_error
-def body_decrypt(ciphers, infile, process_output=None, start_coordinate=0, end_coordinate=None):
+def body_decrypt(ciphers, edits, infile, process_output=None, start_coordinate=0, end_coordinate=None):
     '''Decrypting the data section and verifying its checksum'''
 
     LOG.debug("  Start Coordinate: %s", start_coordinate)
@@ -130,8 +168,6 @@ def body_decrypt(ciphers, infile, process_output=None, start_coordinate=0, end_c
                  end_coordinate is not None)
     
     LOG.info("Decrypting content")
-
-    do_process = callable(process_output)
 
     # Dealing with the range
     if has_range:
@@ -155,6 +191,7 @@ def body_decrypt(ciphers, infile, process_output=None, start_coordinate=0, end_c
         LOG.debug(' # of segment: %s', nb_segments)
 
     # Decryption
+    do_process = callable(process_output)
     for i, segment in enumerate(_cipher_box(infile, ciphers)):
         #LOG.debug("Segment: %s..%s", segment[:30], segment[-30:])
         if has_range and i == 0 and start_offset:
@@ -178,27 +215,18 @@ def decrypt(keys, infile, outfile, start_coordinate=0, end_coordinate=None):
     If sender_pubkey is specified, it verifies the provenance of the header
     '''
     LOG.info('Decrypting file')
-    header_packets = header_parse(infile)
-    session_keys, _ = header_decrypt(header_packets, keys)
+    header_packets = header.parse(infile)
+    packets, _ = header.decrypt(header_packets, keys)
 
     # Filter out the unsupported methods
     # They should be a stream (0000, session_key)
     # Bark is anyone is malformed
-    def make_ciphers():
-        for session_key in session_keys:
-            encryption_method = int.from_bytes(session_key[:4], byteorder='little')
-            LOG.debug('Encryption Method: %d', encryption_method)
-            if encryption_method != 0:
-                LOG.warning('Unsupported bulk encryption method: %d', encryption_method)
-                continue
-            LOG.debug('Session key: %s', session_key[4:])
-            yield ChaCha20Poly1305(session_key[4:])
-
-    ciphers = list(make_ciphers())
+    ciphers, edits = header.parse_packets(packets)
+                
     if not ciphers:
         raise InvalidTag('No supported encryption method')
     
-    return body_decrypt(ciphers,
+    return body_decrypt(ciphers, edits,
                         infile,
                         process_output=outfile.write,
                         start_coordinate=start_coordinate,
@@ -217,9 +245,9 @@ def reencrypt(keys, recipient_keys, infile, outfile, chunk_size=4096, keep_ignor
     The encrypted data section is only copied from infile to outfile.'''
 
     # Decrypt and re-encrypt the header
-    header_packets = header_parse(infile)
-    packets = header_reencrypt(header_packets, keys, recipient_keys, keep_ignored=keep_ignored)
-    outfile.write(header_serialize(packets))
+    header_packets = header.parse(infile)
+    packets = header.reencrypt(header_packets, keys, recipient_keys, keep_ignored=keep_ignored)
+    outfile.write(header.serialize(packets))
 
     # Stream the remainder
     LOG.info(f'Streaming the remainder of the file')
@@ -230,3 +258,4 @@ def reencrypt(keys, recipient_keys, infile, outfile, chunk_size=4096, keep_ignor
         outfile.write(data)
 
     LOG.info('Reencryption Successful')
+

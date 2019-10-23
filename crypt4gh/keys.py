@@ -2,28 +2,70 @@
 
 '''This module implements the public/private key format for Crypt4GH.'''
 
+import sys
 import os
 import io
 import logging
+import logging.config
 from base64 import b64decode, b64encode
 from hashlib import pbkdf2_hmac
+#import traceback
+from functools import partial
+from getpass import getpass
 import bcrypt
 try:
     from hashlib import scrypt
-    with_scrypt = True
+    scrypt_supported = True
 except:
     #import sys
     #print('Warning: No support for scrypt', file=sys.stderr)
-    with_scrypt = False
+    scrypt_supported = False
 
 from nacl.public import PrivateKey
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
+from docopt import docopt
+
 
 from . import exit_on_invalid_passphrase
+from . import __title__, __version__, PROG
 
 LOG = logging.getLogger(__name__)
 
+DEFAULT_LOG = os.getenv('C4GH_LOG', None)
+DEFAULT_PK  = os.getenv('C4GH_PUBLIC_KEY', '~/.c4gh/key.pub')
+DEFAULT_SK  = os.getenv('C4GH_SECRET_KEY', '~/.c4gh/key')
+
 MAGIC_WORD = b'c4gh-v1'
+
+__doc__ = f'''
+
+Utility for the cryptographic GA4GH standard, reading from stdin and outputting to stdout.
+
+Usage:
+   {PROG}-keygen [-hv] [--log <file>] [-f] [--pk <path>] [--sk <path>] [--nocrypt] [-C <comment>]
+
+Options:
+   -h, --help             Prints this help and exit
+   -v, --version          Prints the version and exits
+   --log <file>           Path to the logger file (in YML format)
+   --sk <keyfile>         Curve25519-based Private key [default: {DEFAULT_SK}]
+   --pk <keyfile>         Curve25519-based Public key  [default: {DEFAULT_PK}]
+   -C <comment>           Key's Comment
+   --nocrypt              Do not encrypt the private key.
+                          Otherwise it is encrypted in the Crypt4GH key format
+   -f                     Overwrite the destination files
+
+
+Environment variables:
+   C4GH_LOG         If defined, it will be used as the default logger
+   C4GH_PUBLIC_KEY  If defined, it will be used as the default public key (ie --pk ${{C4GH_PUBLIC_KEY}})
+   C4GH_SECRET_KEY  If defined, it will be used as the default secret key (ie --sk ${{C4GH_SECRET_KEY}})
+   C4GH_PASSPHRASE  If defined, it will be used as the passphrase
+                    for decoding the secret key, replacing the callback.
+                    Note: this is insecure. Only used to testing
+
+'''
+
 
 #######################################################################
 ## Encoded strings
@@ -55,17 +97,18 @@ def _derive_key(alg, passphrase, salt, rounds):
 #######################################################################
 ## Encoding
 #######################################################################
-# Ideally, scrypt is chosen over bcrypt or pbkdf2_hmac_sha256
-# But in case there is no support for it, we pick bcrypt
+
 _KDFS = {
     b'scrypt': (16, None),
     b'bcrypt': (16, 100),
     b'pbkdf2_hmac_sha256': (16, 100000),
 }
 
-def _encode_encrypted_private_key(key, passphrase, comment, rounds):
-    global _KDFS, with_scrypt
-    kdfname = b'scrypt' if with_scrypt else b'bcrypt'
+def _encode_encrypted_private_key(key, passphrase, comment):
+    global _KDFS, scrypt_supported
+    # Ideally, scrypt is chosen over bcrypt or pbkdf2_hmac_sha256
+    # But in case there is no support for it, we pick bcrypt
+    kdfname = b'scrypt' if scrypt_supported else b'bcrypt'
     saltsize, rounds = _KDFS[kdfname]
     salt = os.urandom(saltsize)
     derived_key = _derive_key(kdfname, passphrase, salt, rounds)
@@ -84,7 +127,7 @@ def _encode_encrypted_private_key(key, passphrase, comment, rounds):
 	    (_encode_string(comment) if comment is not None else b''))
 
 
-def generate(seckey, pubkey, callback=None, comment=None, rounds=100):
+def generate(seckey, pubkey, callback=None, comment=None):
     '''Generate a keypair.'''
 
     # Generate the keys
@@ -103,7 +146,7 @@ def generate(seckey, pubkey, callback=None, comment=None, rounds=100):
         if callback:
             is_encrypted = True
             passphrase = callback()
-            pkey = _encode_encrypted_private_key(sk, passphrase.encode(), comment, rounds)
+            pkey = _encode_encrypted_private_key(sk, passphrase.encode(), comment)
             LOG.debug('Encoded Private Key: %s', pkey.hex().upper())
         else:
             import sys
@@ -152,26 +195,79 @@ def _parse_encrypted_key(stream, callback):
     encrypted_data = private_data[12:]
     return ChaCha20Poly1305(shared_key).decrypt(nonce, encrypted_data, None)  # No add
 
-def _load(keyfile):
-    with open(keyfile, 'rb') as f:
+def _load(filepath):
+    with open(filepath, 'rb') as f:
         lines = f.readlines()
         is_encrypted = (b'ENCRYPTED' in lines[0])
         return is_encrypted, b64decode(b''.join(lines[1:-1]))
 
-def get_public_key(keyfile):
+def get_public_key(filepath):
     '''Read the public key from keyfile location.'''
-    is_encrypted, data = _load(keyfile)
+    is_encrypted, data = _load(filepath)
     assert( not is_encrypted )
     return data
 
-def get_private_key(keyfile, callback):
+def get_private_key(filepath, callback):
     '''Read the private key from keyfile location.
 
     If the private key is encrypted, the user will be prompted for the passphrase.
     '''
-    is_encrypted, data = _load(keyfile)
+    is_encrypted, data = _load(filepath)
     if is_encrypted:
         return _parse_encrypted_key(io.BytesIO(data), callback)
     return data
 
 
+###################
+### CLI
+###################
+
+
+def run(argv=sys.argv[1:]):
+
+    # Parse CLI arguments
+    version = f'{__title__} (version {__version__})'
+    args = docopt(__doc__, argv, help=True, version=version)
+
+    # Logging
+    logger = args['--log'] or DEFAULT_LOG
+    if logger and os.path.exists(logger):
+        with open(logger, 'rt') as stream:
+            import yaml
+            logging.config.dictConfig(yaml.safe_load(stream))
+
+    # I prefer to clean up
+    for s in ['--log', '--help', '--version']:#, 'help', 'version']:
+        del args[s]
+
+    # print(args)
+
+    pubkey = os.path.expanduser(args['--pk'])
+    seckey = os.path.expanduser(args['--sk'])
+    if not args['-f']: # Don't force
+        for k in (pubkey, seckey):
+            if os.path.isfile(k):
+                yn = input(f'{k} already exists. Do you want to overwrite it? (y/n) ')
+                if yn != 'y':
+                    print('Ok. Fair enough. Exiting.')
+                    #sys.exit(0)
+                    return
+                
+    do_crypt = not args['--nocrypt']
+    cb = partial(getpass, prompt=f'Passphrase for {args["--sk"]}: ') if do_crypt else None
+    comment = args['-C'].encode() if args['-C'] else None
+    generate(seckey, pubkey, callback=cb, comment=comment)
+
+def main(argv=sys.argv[1:]):
+    try:
+        run(argv)
+    except KeyboardInterrupt:
+        pass
+    # except Exception as e:
+    #     _, _, exc_tb = sys.exc_info()
+    #     traceback.print_tb(exc_tb, file=sys.stderr)
+    #     sys.exit(1)
+
+if __name__ == '__main__':
+    assert sys.version_info >= (3, 6), "This tool requires python version 3.6 or higher"
+    main()

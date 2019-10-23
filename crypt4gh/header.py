@@ -15,6 +15,19 @@ from . import __version__
 
 LOG = logging.getLogger(__name__)
 
+PACKET_TYPE_DATA_ENC = 0
+PACKET_TYPE_EDIT_LIST = 1
+
+# Packet Types Conventions
+# ------------------------
+#
+# 0: Data encryption parameters
+# 1: Data Edit list
+# else: NotSupported
+
+PACKET_TYPE_DATA_ENC = 0
+PACKET_TYPE_EDIT_LIST = 1
+
 # -------------------------------------
 # Header Envelope
 # -------------------------------------
@@ -47,6 +60,8 @@ def parse(stream):
         LOG.debug('========== Packet %d', i)
         encrypted_packet_len = int.from_bytes(stream.read(4), byteorder='little')
         LOG.debug('packet length: %d', encrypted_packet_len)
+        if encrypted_packet_len < 0:
+            raise ValueError(f'Invalid packet length {encrypted_packet_len}')
         encrypted_packet_data = stream.read(encrypted_packet_len)
         #LOG.debug('packet data: %s', encrypted_packet_data.hex())
         if len(encrypted_packet_data) < encrypted_packet_len:
@@ -69,6 +84,52 @@ def serialize(packets):
                       packet
                       for packet in packets ))
 
+
+def make_packet_data_enc(encryption_method, session_key):
+    return PACKET_TYPE_DATA_ENC.to_bytes(4,'little') + encryption_method.to_bytes(4,'little') + session_key
+
+def make_packet_data_edit_list(edit_list):
+    if isinstance(edit_list, GeneratorType):
+        edit_list = list(edit_list)
+    return (PACKET_TYPE_EDIT_LIST.to_bytes(4,'little') + 
+            len(edit_list).to_bytes(4,'little') +
+            b''.join( n1.to_bytes(4,'little') + n2.to_bytes(4,'little')
+                      for (n1,n2) in edit_list ))
+
+
+def parse_packets(packets):
+
+    ciphers = []
+    edits = None
+
+    for packet in packets:
+        packet_type = int.from_bytes(packet[:4], byteorder='little')
+        LOG.debug('Packet type: %d', packet_type)
+
+        if packet_type == 0:
+            encryption_method = int.from_bytes(packet[4:8], byteorder='little')
+            if encryption_method != 0:
+                LOG.warning('Unsupported bulk encryption method: %d', encryption_method)
+                raise ValueError(f'Unsupported bulk encryption method: {encryption_method}')
+            LOG.debug('Encryption Method: %d', encryption_method)
+            session_key = packet[8:]
+            LOG.debug('Session key: %s', session_key)
+            ciphers.append(ChaCha20Poly1305(session_key))
+
+        elif packet_type == 1:
+            nb_lengths = int.from_bytes(packet[4:8], byteorder='little')
+            LOG.debug('Edit list length: %d', nb_lengths)
+            if nb_lengths < 0 or len(packet) - 8 < 8 * nb_lengths:
+                raise ValueError('Invalid edit list')
+            if edits is not None: # reject files if many edit list packets
+                raise ValueError('Invalid file: Too many edit list packets')
+            edits = [int.from_bytes(lengths[i:i+8], byteorder='little') for i in range(8, (nb_lengths+1) * 8, 8)]
+
+        else: # Should I just ignore them and not break?
+            raise ValueError(f'Invalid packet type {packet_type}')
+
+
+    return (ciphers, edits)
 
 # -------------------------------------
 # Header Encryption Methods Conventions
@@ -115,9 +176,6 @@ def decrypt_X25519_Chacha20_Poly1305(encrypted_part, privkey, sender_pubkey=None
     LOG.debug('   peer pubkey: %s', peer_pubkey.hex())
     LOG.debug('         nonce: %s', nonce.hex())
     LOG.debug('encrypted data: %s', packet_data.hex())
-
-    if len(packet_data) != 52: # 4+32 + tag
-        raise ValueError('Invalid encrypted data length')
 
     # X25519 shared key
     pubkey = bytes(PrivateKey(privkey).public_key)  # slightly inefficient, but working

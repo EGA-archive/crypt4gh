@@ -20,14 +20,24 @@ DEFAULT_SK  = os.getenv('C4GH_SECRET_KEY', '~/.c4gh/key')
 DEFAULT_LOG = os.getenv('C4GH_LOG', None)
 
 # We make the following choices for this utility.
-# Even though the library can encrypt/decrypt/reencrypt for multiple user, using multiple session keys,
-# the command-line options allowed only one recipient (ie --recipient_sk can not be repeated)
-# and only one writer/sender.
+#
+# Even though the library can encrypt/decrypt/reencrypt for multiple users, and use multiple session keys,
+# the command-line options allow only one recipient (ie --recipient_sk can not be repeated)
+# and only one writer/sender. The code creates only one session key when encrypting a stream.
 # This simplifies the code
 #
-# Moreover, we do separate 'rearrange' from 'reencrypt', to make it simpler.
+# We do separate 'rearrange' from 'reencrypt', to make it simpler.
 # If you want to combine them, pipe one into the other.
-
+#
+# Reencrypt has the option to "trim" the headers.
+# That means, we toss away the packets that we can't decrypt, since they are targeting another user.
+#
+# Rearrange does not have that option, as changing the edit list packet for the current user might
+# result in the data section not containing the same blocks.
+#
+# Range <start-end> is applied to the "decrypted file" (ie the original content, as if no encryption was applied).
+# This needs to be combined with the edit list: First we apply (virtually) the edit list, and then apply the
+# <start-end> chunking. We make the choice that you can only use one range, and not multiple ones, as in the edit list.
 
 __doc__ = f'''
 

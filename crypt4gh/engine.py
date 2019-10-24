@@ -89,6 +89,8 @@ def encrypt(keys, infile, outfile, start_coordinate=0, end_coordinate=None):
     header_content = header.make_packet_data_enc(encryption_method, session_key)
     header_packets = header.encrypt(header_content, keys)
     header_bytes = header.serialize(header_packets)
+
+    LOG.debug('header length: %d', len(header_bytes))
     outfile.write(header_bytes)
 
     # ...and cue music
@@ -110,11 +112,13 @@ def encrypt(keys, infile, outfile, start_coordinate=0, end_coordinate=None):
 
         data = bytes(segment) # this is a full segment
         _encrypt_segment(data, outfile.write, cipher)
-        max_length -= segment_len
+        if max_length:
+            max_length -= segment_len
     
     # We reached the last segment and the max_length
-    data = bytes(segment[:segment_len]) # to discard the bytes from the previous segments
-    _encrypt_segment(data, outfile.write, cipher)
+    if segment_len > 0:
+        data = bytes(segment[:segment_len]) # to discard the bytes from the previous segments
+        _encrypt_segment(data, outfile.write, cipher)
 
     LOG.info('Encryption Successful')
 
@@ -218,14 +222,14 @@ def decrypt(keys, infile, outfile, start_coordinate=0, end_coordinate=None):
     header_packets = header.parse(infile)
     packets, _ = header.decrypt(header_packets, keys)
 
-    # Filter out the unsupported methods
-    # They should be a stream (0000, session_key)
-    # Bark is anyone is malformed
-    ciphers, edits = header.parse_packets(packets)
-                
-    if not ciphers:
+    if not packets: # no packets were decrypted
         raise InvalidTag('No supported encryption method')
-    
+
+    data_packets, edit_packet = header.partition_packets(packets)
+    # Parse returns the session key (since it should be method 0) 
+    ciphers = [ChaCha20Poly1305(header.parse_enc_packet(packet)) for packet in data_packets]
+    edits = header.parse_edit_list_packet(edit_packet) if edit_packet else None
+
     return body_decrypt(ciphers, edits,
                         infile,
                         process_output=outfile.write,

@@ -84,7 +84,6 @@ def serialize(packets):
                       packet
                       for packet in packets ))
 
-
 def make_packet_data_enc(encryption_method, session_key):
     return PACKET_TYPE_DATA_ENC.to_bytes(4,'little') + encryption_method.to_bytes(4,'little') + session_key
 
@@ -97,39 +96,45 @@ def make_packet_data_edit_list(edit_list):
                       for (n1,n2) in edit_list ))
 
 
-def parse_packets(packets):
+def partition_packets(packets):
 
-    ciphers = []
+    enc_packets = []
     edits = None
 
     for packet in packets:
-        packet_type = int.from_bytes(packet[:4], byteorder='little')
-        LOG.debug('Packet type: %d', packet_type)
 
-        if packet_type == 0:
-            encryption_method = int.from_bytes(packet[4:8], byteorder='little')
-            if encryption_method != 0:
-                LOG.warning('Unsupported bulk encryption method: %d', encryption_method)
-                raise ValueError(f'Unsupported bulk encryption method: {encryption_method}')
-            LOG.debug('Encryption Method: %d', encryption_method)
-            session_key = packet[8:]
-            LOG.debug('Session key: %s', session_key)
-            ciphers.append(ChaCha20Poly1305(session_key))
+        packet_type = packet[:4]
 
-        elif packet_type == 1:
-            nb_lengths = int.from_bytes(packet[4:8], byteorder='little')
-            LOG.debug('Edit list length: %d', nb_lengths)
-            if nb_lengths < 0 or len(packet) - 8 < 8 * nb_lengths:
-                raise ValueError('Invalid edit list')
+        if packet_type == b'\x00\x00\x00\x00': # 0 little endian
+            enc_packets.append(packet[4:])
+
+        elif packet_type == b'\x01\x00\x00\x00': # 1 little endian
             if edits is not None: # reject files if many edit list packets
                 raise ValueError('Invalid file: Too many edit list packets')
-            edits = [int.from_bytes(lengths[i:i+8], byteorder='little') for i in range(8, (nb_lengths+1) * 8, 8)]
+            edits = packet[4:]
 
-        else: # Should I just ignore them and not break?
+        else: # Bark if unsupported packet. Don't just ignore it
+            packet_type = int.from_bytes(packet_type, byteorder='little')
             raise ValueError(f'Invalid packet type {packet_type}')
 
+    return (enc_packets, edits)
 
-    return (ciphers, edits)
+def parse_enc_packet(packet):
+    # if encryption_method != 0:
+    encryption_method = packet[0:4]
+    if encryption_method != b'\x00\x00\x00\x00': # 0 little endian
+        LOG.warning('Unsupported bulk encryption method: %d', encryption_method)
+        encryption_method = int.from_bytes(encryption_method, byteorder='little')
+        raise ValueError(f'Unsupported bulk encryption method: {encryption_method}')
+    session_key = packet[4:]
+    return session_key
+
+def parse_edit_list_packet(packet):
+    nb_lengths = int.from_bytes(packet[:4], byteorder='little')
+    LOG.debug('Edit list length: %d', nb_lengths)
+    if nb_lengths < 0 or len(packet) - 4 < 8 * nb_lengths: # don't bark if longer
+        raise ValueError('Invalid edit list')
+    return [int.from_bytes(packet[i:i+8], byteorder='little') for i in range(4, (nb_lengths+1) * 8, 8)]
 
 # -------------------------------------
 # Header Encryption Methods Conventions
@@ -187,23 +192,30 @@ def decrypt_X25519_Chacha20_Poly1305(encrypted_part, privkey, sender_pubkey=None
     return engine.decrypt(nonce, packet_data, None)  # No add
 
 
-def decrypt_packet(data, keys):
-    packet_encryption_method = int.from_bytes(data[:4], byteorder='little')
+def decrypt_packet(packet, keys):
+    '''Decrypt the packet, scanning all the `keys`
+
+    `keys` is iterated and each item must be of the form (method, ...).
+    
+    Returns None if no key worked.
+    '''
+    packet_encryption_method = int.from_bytes(packet[:4], byteorder='little')
     LOG.debug('Header Packet Encryption Method: %d', packet_encryption_method)
     
     for method, *key in keys:
-
+        
         if packet_encryption_method != method:
             continue # not a corresponding key anyway
 
         if packet_encryption_method == 0: # We try a chacha20 key
             try:
                 privkey, sender_pubkey = key # must fit
-                return decrypt_X25519_Chacha20_Poly1305(data[4:], privkey, sender_pubkey=sender_pubkey)
-            except TypeError as te:
-                LOG.error('Not a X25519 key: ignoring | %s', te)
+                return decrypt_X25519_Chacha20_Poly1305(packet[4:], privkey, sender_pubkey=sender_pubkey)
             except InvalidTag as tag:
                 LOG.error('Packet Decryption failed: %s', tag)
+            except Exception as e: # Any other error, like (IndexError, TypeError, ValueError)
+                LOG.error('Not a X25519 key: ignoring | %s', e)
+                # try the next one
 
         elif packet_encryption_method == 1:
             LOG.warning('AES-256-GCM support is not implemented')
@@ -219,27 +231,36 @@ def decrypt_packet(data, keys):
 #
 # Generators that try all the keys and yield header packets
 
-def encrypt(data, keys):
-    '''Computes the encrypted part'''
+def encrypt(packet, keys):
+    '''Computes the encrypted part, using all `keys`
+
+    `keys` is iterated and each item must be of the form (method, ...).
+
+    We only support method=0.
+    
+    Returns None if no key worked.
+    '''
+    ''''''
 
     for method, *key in keys:
+
         if method != 0:
             LOG.warning('Unsupported key type (%d), skipping', method)
             continue
 
         try:
-            seckey, recipient_pubkey = key # must fit
-        except TypeError as te:
-            LOG.error('Not a X25519 key: ignoring | %s', te)
+            seckey, recipient_pubkey = key
+        except Exception as e:
+            LOG.error('Not a X25519 key: ignoring | %s', e)
             continue
 
         # Otherwise, we encrypt with chacha20
         yield (method.to_bytes(4,'little') +
-               encrypt_X25519_Chacha20_Poly1305(data, seckey, recipient_pubkey))
+               encrypt_X25519_Chacha20_Poly1305(packet, seckey, recipient_pubkey))
         
 
 def decrypt(encrypted_packets, keys):
-    '''Partition the packets into those that we can decrypt and the others.
+    '''Partition the packets into those that we can be decrypt and the others.
 
     The output is 2 lists: one with decrypted packets and the other not understood encrypted packets'''
 
@@ -261,16 +282,31 @@ def decrypt(encrypted_packets, keys):
 # Header Re-Encryption
 # -------------------------------------
 
-def reencrypt(header_packets, keys, recipient_keys, keep_ignored=False):
+def reencrypt(header_packets, keys, recipient_keys, trim=False):
     '''Re-encrypt the given header'''
     LOG.info(f'Reencrypting the header')
 
     decrypted_packets, ignored_packets = decrypt(header_packets, keys)
 
-    packets = list(chain(encrypt(data, recipient_keys) for _,data in decrypted_packets))
+    packets = [encrypt(packet, recipient_keys) for packet in decrypted_packets]
 
-    if keep_ignored:
+    if not trim:
         packets.extend(ignored_packets)
+
+    return packets
+
+
+# -------------------------------------
+# Header Re-Arrange
+# -------------------------------------
+
+def rearrange(header_packets, keys):
+    '''Re-encrypt the given header'''
+    LOG.info(f'Reencrypting the header')
+
+    decrypted_packets, _ = decrypt(header_packets, keys) # ignore the other packets
+
+    packets = [encrypt(packet, recipient_keys) for packet in decrypted_packets]
 
     return packets
 

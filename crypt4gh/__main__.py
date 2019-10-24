@@ -23,6 +23,9 @@ def main(argv=sys.argv[1:]):
 
     except KeyboardInterrupt:
         pass
+    except ValueError as e:
+        print(e, file=sys.stderr)
+        sys.exit(1)
     # except Exception as e:
     #     _, _, exc_tb = sys.exc_info()
     #     traceback.print_tb(exc_tb, file=sys.stderr)

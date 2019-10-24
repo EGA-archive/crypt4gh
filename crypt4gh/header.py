@@ -288,6 +288,9 @@ def reencrypt(header_packets, keys, recipient_keys, trim=False):
 
     decrypted_packets, ignored_packets = decrypt(header_packets, keys)
 
+    if not decrypted_packets:
+        raise ValueError('No header packet could be decrypted')
+
     packets = [encrypt(packet, recipient_keys) for packet in decrypted_packets]
 
     if not trim:

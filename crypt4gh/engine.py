@@ -223,7 +223,7 @@ def decrypt(keys, infile, outfile, start_coordinate=0, end_coordinate=None):
     packets, _ = header.decrypt(header_packets, keys)
 
     if not packets: # no packets were decrypted
-        raise InvalidTag('No supported encryption method')
+        raise ValueError('No supported encryption method')
 
     data_packets, edit_packet = header.partition_packets(packets)
     # Parse returns the session key (since it should be method 0) 
@@ -244,13 +244,13 @@ def decrypt(keys, infile, outfile, start_coordinate=0, end_coordinate=None):
 ##############################################################
 
 
-def reencrypt(keys, recipient_keys, infile, outfile, chunk_size=4096, keep_ignored=False):
+def reencrypt(keys, recipient_keys, infile, outfile, chunk_size=4096, trim=False):
     '''Extract header packets from infile and generate another one to outfile.
     The encrypted data section is only copied from infile to outfile.'''
 
     # Decrypt and re-encrypt the header
     header_packets = header.parse(infile)
-    packets = header.reencrypt(header_packets, keys, recipient_keys, keep_ignored=keep_ignored)
+    packets = header.reencrypt(header_packets, keys, recipient_keys, trim=trim)
     outfile.write(header.serialize(packets))
 
     # Stream the remainder

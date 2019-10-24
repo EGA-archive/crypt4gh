@@ -77,6 +77,7 @@ def parse_args(argv=sys.argv[1:]):
 
     # Logging
     logger = args['--log'] or DEFAULT_LOG
+    logging.basicConfig(stream=sys.stderr, level=logging.CRITICAL) # for the root logger
     if logger and os.path.exists(logger):
         with open(logger, 'rt') as stream:
             import yaml
@@ -125,7 +126,8 @@ def encrypt(args):
 
     passphrase = os.getenv('C4GH_PASSPHRASE')
     if passphrase:
-        LOG.warning("Using a passphrase in an environment variable is insecure")
+        #LOG.warning("Using a passphrase in an environment variable is insecure")
+        print("Warning: Using a passphrase in an environment variable is insecure", file=sys.stderr)
         cb = lambda : passphrase
     else:
         cb = partial(getpass, prompt=f'Passphrase for {seckey}: ')
@@ -154,7 +156,8 @@ def decrypt(args):
 
     passphrase = os.getenv('C4GH_PASSPHRASE')
     if passphrase:
-        LOG.warning("Using a passphrase in an environment variable is insecure")
+        #LOG.warning("Using a passphrase in an environment variable is insecure")
+        print("Warning: Using a passphrase in an environment variable is insecure", file=sys.stderr)
         cb = lambda : passphrase
     else:
         cb = partial(getpass, prompt=f'Passphrase for {seckey}: ')
@@ -177,13 +180,19 @@ def reencrypt(args):
     assert( args['reencrypt'] )
 
     seckey = args['--sk'] or DEFAULT_SK
-    if not seckey:
-        raise ValueError('Secret key not specified')
-    seckey = os.path.expanduser(seckey)
-    if not os.path.exists(seckey):
+    seckeypath = os.path.expanduser(seckey)
+    if not os.path.exists(seckeypath):
         raise ValueError('Secret key not found')
-    cb = partial(getpass, prompt=f'Passphrase for {args["--sk"]}: ')
-    seckey = get_private_key(seckey, cb)
+
+    passphrase = os.getenv('C4GH_PASSPHRASE')
+    if passphrase:
+        #LOG.warning("Using a passphrase in an environment variable is insecure")
+        print("Warning: Using a passphrase in an environment variable is insecure", file=sys.stderr)
+        cb = lambda : passphrase
+    else:
+        cb = partial(getpass, prompt=f'Passphrase for {seckey}: ')
+
+    seckey = get_private_key(seckeypath, cb)
 
     recipient_pubkey = get_public_key(os.path.expanduser(args['--recipient_pk']))
     sender_pubkey = get_public_key(os.path.expanduser(args['--sender_pk'])) if args['--sender_pk'] else None

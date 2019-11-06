@@ -110,12 +110,13 @@ def edit_list_oracle(edits):
 
         # data_len >  skip + keep: we need to pull the other (skip,keep) from the edit list
         pos = skip + keep
-        slices = [(skip, pos)]
+        slices = [(skip, pos)] if pos else []
 
         while True:
 
             if not edits: 
-                yield slices
+                if slices:
+                    yield slices
                 raise ProcessingOver() # game over
 
             skip = edits.popleft()

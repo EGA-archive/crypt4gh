@@ -3,16 +3,24 @@ Crypt4GH utility
 ======================
 
 Bob wants to send a message to Alice, containing sensitive data. Bob
-uses `crypt4gh`, a tool to encrypt, decrypt or re-encrypt files
+uses `Crypt4GH, the Global Alliance approved secure method for sharing human genetic data <https://www.ga4gh.org/news/crypt4gh-a-secure-method-for-sharing-human-genetic-data/>`_.
+
+`crypt4gh`, a Python tool to encrypt, decrypt or re-encrypt files,
 according to the :download:`GA4GH encryption file format
-<./static/crypt4gh.pdf>`.
+<http://samtools.github.io/hts-specs/crypt4gh.pdf>`.
+
+.. image:: https://www.ga4gh.org/wp-content/uploads/Crypt4GH_comic.png
+   :target: https://www.ga4gh.org/news/crypt4gh-a-secure-method-for-sharing-human-genetic-data/
+   :alt: How Crypt4GH works
+
+----
 
 Alice and Bob generate both a pair of public/private keys.
 
 .. code-block:: console
 
-   crypt4gh generate --sk alice.sec --pk alice.pub
-   crypt4gh generate --sk bob.sec --pk bob.pub
+   crypt4gh-keygen --sk alice.sec --pk alice.pub
+   crypt4gh-keygen --sk bob.sec --pk bob.pub
 
 
 Bob encrypts a file for Alice:
@@ -28,8 +36,8 @@ Alice decrypts the encrypted file:
    $ crypt4gh decrypt --sk alice.sec < file.c4gh
 
 
-.. image:: https://asciinema.org/a/JtctM4ATUBpGM3oQqbQ2Sr6B4.png
-   :target: https://asciinema.org/a/JtctM4ATUBpGM3oQqbQ2Sr6B4
+.. image:: https://asciinema.org/a/mmCBfBdCFfcYCRBuTSe3kjCFs.png
+   :target: https://asciinema.org/a/mmCBfBdCFfcYCRBuTSe3kjCFs
    :alt: Demo
 
 
@@ -56,3 +64,4 @@ Table of Contents
 
 .. |moreabout| unicode:: U+261E .. right pointing finger
 .. |connect| unicode:: U+21cc .. <-_>
+

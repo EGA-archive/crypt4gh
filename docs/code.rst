@@ -19,7 +19,7 @@ Crypt4gh Engine
 ***************
 
 .. automodule:: crypt4gh.engine
-   :members: encrypt, decrypt, reencrypt
+   :members: encrypt, decrypt, reencrypt, rearrange
 
 ----
 
@@ -28,7 +28,7 @@ Crypt4gh Header
 ***************
 
 .. automodule:: crypt4gh.header
-   :members: encrypt, decrypt, reencrypt
+   :members: encrypt, decrypt, reencrypt, rearrange
 
 ----
 

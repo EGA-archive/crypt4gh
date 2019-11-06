@@ -15,17 +15,6 @@ import crypt4gh
 
 # -- General configuration ------------------------------------------------
 
-class Mock(MagicMock):
-    @classmethod
-    def __getattr__(cls, name):
-        return MagicMock()
-
-
-# Some modules need to be mocked
-MOCK_MODULES = ['cryptography.hazmat.primitives.ciphers.aead', 'nacl.bindings', 'nacl.public',
-                'yaml', 'docopt', 'bcrypt']
-sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
-
 # If your documentation needs a minimal Sphinx version, state it here.
 #
 # needs_sphinx = '1.0'
@@ -59,15 +48,15 @@ current_year = str(datetime.date.today().year)
 
 # General information about the project.
 project = 'Crypt4GH'
-copyright = f'{current_year}, EGA System Developers'
-author = 'EGA System Developers'
+copyright = f'{current_year}, EGA-CRG System Developers'
+author = crypt4gh.__author__
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 #
 # The short X.Y version.
-version = str(crypt4gh.__version__)
+version = 'Version '+str(crypt4gh.__version__)
 # The full version, including alpha/beta/rc tags.
 release = str(crypt4gh.__version__)
 
@@ -146,6 +135,6 @@ def setup(app):
 # -- Other stuff ----------------------------------------------------------
 htmlhelp_basename = 'crypt4gh'
 latex_elements = {}
-latex_documents = [ (master_doc, 'crypt4gh.tex', 'GA4GH cryptor', 'EGA System Developers', 'manual') ]
+latex_documents = [ (master_doc, 'crypt4gh.tex', 'GA4GH cryptor', 'EGA-CRG System Developers', 'manual') ]
 man_pages = [ (master_doc, 'crypt4gh', 'GA4GH cryptor', [author], 1) ]
 texinfo_documents = [ (master_doc, 'crypt4gh', 'GA4GH cryptor', author, 'GA4GH cryptor', 'GA4GH cryptographic tools', 'Miscellaneous') ]

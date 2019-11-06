@@ -38,7 +38,7 @@ DEFAULT_SK  = os.getenv('C4GH_SECRET_KEY', '~/.c4gh/key')
 MAGIC_WORD = b'c4gh-v1'
 
 __doc__ = f'''
-
+ 
 Utility for the cryptographic GA4GH standard, reading from stdin and outputting to stdout.
 
 Usage:
@@ -63,7 +63,7 @@ Environment variables:
    C4GH_PASSPHRASE  If defined, it will be used as the passphrase
                     for decoding the secret key, replacing the callback.
                     Note: this is insecure. Only used for testing
-
+ 
 '''
 
 

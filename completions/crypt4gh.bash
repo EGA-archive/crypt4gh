@@ -1,4 +1,3 @@
-#!/bin/env bash
 
 _crypt4gh()
 {
@@ -6,7 +5,7 @@ _crypt4gh()
     cur="${COMP_WORDS[COMP_CWORD]}"
 
     if [ $COMP_CWORD -eq 1 ]; then
-        COMPREPLY=( $( compgen -W '-h --help -v --version --log= encrypt decrypt reencrypt generate' -- $cur) )
+        COMPREPLY=( $( compgen -W '-h --help -v --version --log= -h --help -v --version --log= -h --help -v --version --log= -h --help -v --version --log= encrypt decrypt rearrange reencrypt' -- $cur) )
     else
         case ${COMP_WORDS[1]} in
             encrypt)
@@ -15,11 +14,11 @@ _crypt4gh()
             decrypt)
             _crypt4gh_decrypt
         ;;
+            rearrange)
+            _crypt4gh_rearrange
+        ;;
             reencrypt)
             _crypt4gh_reencrypt
-        ;;
-            generate)
-            _crypt4gh_generate
         ;;
         esac
 
@@ -32,7 +31,7 @@ _crypt4gh_encrypt()
     cur="${COMP_WORDS[COMP_CWORD]}"
 
     if [ $COMP_CWORD -ge 2 ]; then
-        COMPREPLY=( $( compgen -W '--sk= --recipient_pk= ' -- $cur) )
+        COMPREPLY=( $( compgen -W '--sk= --recipient_pk= --range= ' -- $cur) )
     fi
 }
 
@@ -46,25 +45,24 @@ _crypt4gh_decrypt()
     fi
 }
 
+_crypt4gh_rearrange()
+{
+    local cur
+    cur="${COMP_WORDS[COMP_CWORD]}"
+
+    if [ $COMP_CWORD -ge 2 ]; then
+        COMPREPLY=( $( compgen -W '--sk= --range= ' -- $cur) )
+    fi
+}
+
 _crypt4gh_reencrypt()
 {
     local cur
     cur="${COMP_WORDS[COMP_CWORD]}"
 
     if [ $COMP_CWORD -ge 2 ]; then
-        COMPREPLY=( $( compgen -fW '--sk= --recipient_pk= --sender_public_key ' -- $cur) )
-    fi
-}
-
-_crypt4gh_generate()
-{
-    local cur
-    cur="${COMP_WORDS[COMP_CWORD]}"
-
-    if [ $COMP_CWORD -ge 2 ]; then
-        COMPREPLY=( $( compgen -W '-f --pk= --sk= --nocrypt -C= -R= ' -- $cur) )
+        COMPREPLY=( $( compgen -fW '--sk= --recipient_pk= --sender_public_key -t --trim ' -- $cur) )
     fi
 }
 
 complete -o bashdefault -o default -o filenames -F _crypt4gh crypt4gh
-

@@ -11,12 +11,9 @@ from nacl.bindings import crypto_kx_client_session_keys, crypto_kx_server_sessio
 from nacl.public import PrivateKey
 from cryptography.exceptions import InvalidTag
 
-from . import __version__
+from . import __version__, SEGMENT_SIZE
 
 LOG = logging.getLogger(__name__)
-
-PACKET_TYPE_DATA_ENC = 0
-PACKET_TYPE_EDIT_LIST = 1
 
 # Packet Types Conventions
 # ------------------------
@@ -24,9 +21,6 @@ PACKET_TYPE_EDIT_LIST = 1
 # 0: Data encryption parameters
 # 1: Data Edit list
 # else: NotSupported
-
-PACKET_TYPE_DATA_ENC = 0
-PACKET_TYPE_EDIT_LIST = 1
 
 # -------------------------------------
 # Header Envelope
@@ -71,8 +65,9 @@ def parse(stream):
 
 def serialize(packets):
     '''Serializes header packets to a byte stream'''
-    if isinstance(packets, GeneratorType):
-        packets = list(packets)
+    packets = list(packets)
+    # if isinstance(packets, GeneratorType):
+    #     packets = list(packets)
     if not packets:
         raise ValueError('No packets to serialize')
     packets_count = len(packets)
@@ -84,17 +79,12 @@ def serialize(packets):
                       packet
                       for packet in packets ))
 
-def make_packet_data_enc(encryption_method, session_key):
-    return PACKET_TYPE_DATA_ENC.to_bytes(4,'little') + encryption_method.to_bytes(4,'little') + session_key
+# -------------------------------------
+# Encrypted data packet
+# -------------------------------------
 
-def make_packet_data_edit_list(edit_list):
-    if isinstance(edit_list, GeneratorType):
-        edit_list = list(edit_list)
-    return (PACKET_TYPE_EDIT_LIST.to_bytes(4,'little') + 
-            len(edit_list).to_bytes(4,'little') +
-            b''.join( n1.to_bytes(4,'little') + n2.to_bytes(4,'little')
-                      for (n1,n2) in edit_list ))
-
+PACKET_TYPE_DATA_ENC = b'\x00\x00\x00\x00'  # 0 little endian
+PACKET_TYPE_EDIT_LIST = b'\x01\x00\x00\x00' # 1 little endian
 
 def partition_packets(packets):
 
@@ -105,10 +95,10 @@ def partition_packets(packets):
 
         packet_type = packet[:4]
 
-        if packet_type == b'\x00\x00\x00\x00': # 0 little endian
+        if packet_type == PACKET_TYPE_DATA_ENC: 
             enc_packets.append(packet[4:])
 
-        elif packet_type == b'\x01\x00\x00\x00': # 1 little endian
+        elif packet_type == PACKET_TYPE_EDIT_LIST:
             if edits is not None: # reject files if many edit list packets
                 raise ValueError('Invalid file: Too many edit list packets')
             edits = packet[4:]
@@ -119,22 +109,54 @@ def partition_packets(packets):
 
     return (enc_packets, edits)
 
+# -------------------------------------
+# Encrypted data packet
+# -------------------------------------
+def make_packet_data_enc(encryption_method, session_key):
+    return (PACKET_TYPE_DATA_ENC
+            + encryption_method.to_bytes(4,'little') 
+            + session_key)
+
 def parse_enc_packet(packet):
     # if encryption_method != 0:
     encryption_method = packet[0:4]
     if encryption_method != b'\x00\x00\x00\x00': # 0 little endian
-        LOG.warning('Unsupported bulk encryption method: %d', encryption_method)
+        LOG.warning('Unsupported bulk encryption method: %s', encryption_method)
         encryption_method = int.from_bytes(encryption_method, byteorder='little')
         raise ValueError(f'Unsupported bulk encryption method: {encryption_method}')
     session_key = packet[4:]
     return session_key
 
+# -------------------------------------
+# Edit list packet
+# -------------------------------------
+def make_packet_data_edit_list(edit_list):
+    edit_list = list(edit_list)
+    # if isinstance(edit_list, GeneratorType):
+    #     edit_list = list(edit_list)
+    return (PACKET_TYPE_EDIT_LIST
+            + len(edit_list).to_bytes(4,'little')
+            + b''.join( n.to_bytes(8,'little') for n in edit_list ))
+
+def validate_edit_list(edits):
+    '''Some (obvious) validation'''
+    if any(n < 0 for n in edits):
+        raise ValueError('Invalid edit list: Cannot use negative numbers')
+    if not all(skip < 2 * SEGMENT_SIZE - 1 for skip in edits[0::2]):
+        raise ValueError('Invalid edit list: Data blocks will be ignored')
+    if not all(skip > edits[2::2]): # all but first
+        raise ValueError('Invalid edit list: Cannot skip 0 bytes in between reads')
+    if not (edits[0] < SEGMENT_SIZE):
+        raise ValueError('Invalid edit list: First data block is ignored')
+
 def parse_edit_list_packet(packet):
+    '''Returns a generator to produce the `lengths` numbers from the `packet` bytes'''
     nb_lengths = int.from_bytes(packet[:4], byteorder='little')
     LOG.debug('Edit list length: %d', nb_lengths)
+    LOG.debug('packet content length: %d', len(packet) - 4)
     if nb_lengths < 0 or len(packet) - 4 < 8 * nb_lengths: # don't bark if longer
         raise ValueError('Invalid edit list')
-    return [int.from_bytes(packet[i:i+8], byteorder='little') for i in range(4, (nb_lengths+1) * 8, 8)]
+    return (int.from_bytes(packet[i:i+8], byteorder='little') for i in range(4, nb_lengths * 8, 8)) # generator
 
 # -------------------------------------
 # Header Encryption Methods Conventions
@@ -192,7 +214,7 @@ def decrypt_X25519_Chacha20_Poly1305(encrypted_part, privkey, sender_pubkey=None
     return engine.decrypt(nonce, packet_data, None)  # No add
 
 
-def decrypt_packet(packet, keys):
+def decrypt_packet(packet, keys, sender_pubkey=None):
     '''Decrypt the packet, scanning all the `keys`
 
     `keys` is iterated and each item must be of the form (method, ...).
@@ -209,7 +231,7 @@ def decrypt_packet(packet, keys):
 
         if packet_encryption_method == 0: # We try a chacha20 key
             try:
-                privkey, sender_pubkey = key # must fit
+                privkey, _ = key # must fit
                 return decrypt_X25519_Chacha20_Poly1305(packet[4:], privkey, sender_pubkey=sender_pubkey)
             except InvalidTag as tag:
                 LOG.error('Packet Decryption failed: %s', tag)
@@ -259,7 +281,7 @@ def encrypt(packet, keys):
                encrypt_X25519_Chacha20_Poly1305(packet, seckey, recipient_pubkey))
         
 
-def decrypt(encrypted_packets, keys):
+def decrypt(encrypted_packets, keys, sender_pubkey=None):
     '''Partition the packets into those that we can be decrypt and the others.
 
     The output is 2 lists: one with decrypted packets and the other not understood encrypted packets'''
@@ -269,7 +291,7 @@ def decrypt(encrypted_packets, keys):
 
     for packet in encrypted_packets:
 
-        decrypted_packet = decrypt_packet(packet, keys)
+        decrypted_packet = decrypt_packet(packet, keys, sender_pubkey=sender_pubkey)
         if decrypted_packet is None: # They all failed
             ignored_packets.append(packet)
         else:
@@ -284,14 +306,14 @@ def decrypt(encrypted_packets, keys):
 
 def reencrypt(header_packets, keys, recipient_keys, trim=False):
     '''Re-encrypt the given header'''
-    LOG.info(f'Reencrypting the header')
+    LOG.info('Reencrypting the header')
 
     decrypted_packets, ignored_packets = decrypt(header_packets, keys)
 
     if not decrypted_packets:
         raise ValueError('No header packet could be decrypted')
 
-    packets = [encrypt(packet, recipient_keys) for packet in decrypted_packets]
+    packets = [encrypted_packet for packet in decrypted_packets for encrypted_packet in encrypt(packet, recipient_keys)]
 
     if not trim:
         packets.extend(ignored_packets)
@@ -303,15 +325,74 @@ def reencrypt(header_packets, keys, recipient_keys, trim=False):
 # Header Re-Arrange
 # -------------------------------------
 
-def rearrange(header_packets, keys):
-    '''Re-encrypt the given header'''
-    LOG.info(f'Reencrypting the header')
+def rearrange(header_packets, keys, offset=0, span=None, sender_pubkey=None):
+    '''Re-arrange the edit list in accordance to the [start;end] range.
+    
+    Returns the data_packet as-is and a new edit list packet.
+    It also returns an "oracle". The oracle tells if the "next" segment should be kept (starting by the first).
+    '''
 
-    decrypted_packets, _ = decrypt(header_packets, keys) # ignore the other packets
+    LOG.info('Rearranging the header')
 
-    packets = [encrypt(packet, recipient_keys) for packet in decrypted_packets]
+    LOG.debug("  Start Coordinate: %s", offset)
+    LOG.debug("    End Coordinate: %s", offset + span if span else 'EOF')
+    LOG.debug("      Segment size: %s", SEGMENT_SIZE)
 
-    return packets
+    assert( isinstance(offset, int) and offset >= 0 and (span is None or (isinstance(span, int) and span > 0)) )
+
+    if offset == 0 and span is None:
+        raise ValueError('Nothing to be done')
+
+    # Ok, we have a range as [start; end] or just [start; EOF]
+    # Decrypt the packets, and get to the edit list
+    # Undecryptable packets are tossed away
+
+    decrypted_packets, _ = decrypt(header_packets, keys, sender_pubkey=sender_pubkey)
+
+    if not decrypted_packets:
+        raise ValueError('No header packet could be decrypted')
+
+    data_packets, edit_packet = partition_packets(decrypted_packets)
+
+    #
+    # Note: We do not yet implement chunking a file that already contains an Edit List
+    #
+    if edit_packet is not None:
+        raise NotImplementedError('Not implemented yet')
+
+    LOG.info('No edit list present: making one')
+
+    start_segment, start_offset = divmod(offset, SEGMENT_SIZE)
+    end_segment, end_offset = divmod(offset+span, SEGMENT_SIZE) if span else (None,None)
+
+    LOG.debug('Start segment: %d | Offset: %d', start_segment, start_offset)
+    LOG.debug('  End segment: %s | Offset: %s', end_segment, end_offset)
 
 
+    # This oracle tells you whether you should keep the current segment every time you ask
+    def segment_oracle():
+        count = 0
+        while True:
+            if count < start_segment:
+                yield False
+            else:
+                if end_segment:
+                    yield (count < end_segment or (count == end_segment and end_offset > 0))
+                else:
+                    yield True
+            count += 1
 
+    edit_list = [start_offset]
+    if span:
+        edit_list.append(span)
+
+    LOG.debug('New edit list: %s', edit_list)
+    edit_packet = make_packet_data_edit_list(edit_list)
+
+    LOG.info('Reencrypting all packets')
+
+    packets = [PACKET_TYPE_DATA_ENC + packet for packet in data_packets]
+    packets.append(edit_packet) # adding the edit list at the end
+    packets = [encrypted_packet for packet in packets for encrypted_packet in encrypt(packet, keys)]
+
+    return packets, segment_oracle()

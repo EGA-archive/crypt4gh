@@ -9,6 +9,7 @@ from getpass import getpass
 import re
 
 from docopt import docopt
+from nacl.public import PrivateKey
 
 from . import __title__, __version__, PROG
 from . import engine
@@ -19,28 +20,8 @@ LOG = logging.getLogger(__name__)
 DEFAULT_SK  = os.getenv('C4GH_SECRET_KEY', '~/.c4gh/key')
 DEFAULT_LOG = os.getenv('C4GH_LOG', None)
 
-# We make the following choices for this utility.
-#
-# Even though the library can encrypt/decrypt/reencrypt for multiple users, and use multiple session keys,
-# the command-line options allow only one recipient (ie --recipient_sk can not be repeated)
-# and only one writer/sender. The code creates only one session key when encrypting a stream.
-# This simplifies the code
-#
-# We do separate 'rearrange' from 'reencrypt', to make it simpler.
-# If you want to combine them, pipe one into the other.
-#
-# Reencrypt has the option to "trim" the headers.
-# That means, we toss away the packets that we can't decrypt, since they are targeting another user.
-#
-# Rearrange does not have that option, as changing the edit list packet for the current user might
-# result in the data section not containing the same blocks.
-#
-# Range <start-end> is applied to the "decrypted file" (ie the original content, as if no encryption was applied).
-# This needs to be combined with the edit list: First we apply (virtually) the edit list, and then apply the
-# <start-end> chunking. We make the choice that you can only use one range, and not multiple ones, as in the edit list.
-
 __doc__ = f'''
-
+ 
 Utility for the cryptographic GA4GH standard, reading from stdin and outputting to stdout.
 
 Usage:
@@ -56,16 +37,15 @@ Options:
    --sk <keyfile>         Curve25519-based Private key [default: {DEFAULT_SK}]
    --recipient_pk <path>  Recipient's Curve25519-based Public key
    --sender_pk <path>     Peer's Curve25519-based Public key to verify provenance (aka, signature)
-   --range <start-end>    Byte-range either as  <start-end> or just <start>
+   --range <start-end>    Byte-range either as  <start-end> or just <start> (Start included, End excluded)
    -t, --trim             Keep only header packets that you can decrypt
 
 
 Environment variables:
    C4GH_LOG         If defined, it will be used as the default logger
    C4GH_SECRET_KEY  If defined, it will be used as the default secret key (ie --sk ${{C4GH_SECRET_KEY}})
-
+ 
 '''
-
 
 def parse_args(argv=sys.argv[1:]):
 
@@ -104,14 +84,15 @@ def parse_range(args):
     
     start, end = m.groups()  # end might be None
     start, end = int(start), (int(end) if end else None)
-    if end and start >= end:
+    span = end - start - 1 if end else None
+    if not span:
         raise ValueError(f"Invalid range: {args['--range']}")
-    return (start, end)
+    return (start, span)
 
 def encrypt(args):
     assert( args['encrypt'] )
 
-    range_start, range_end = parse_range(args)
+    range_start, range_span = parse_range(args)
 
     recipient_pubkey = os.path.expanduser(args['--recipient_pk'])
     if not os.path.exists(recipient_pubkey):
@@ -133,13 +114,13 @@ def encrypt(args):
         cb = partial(getpass, prompt=f'Passphrase for {seckey}: ')
 
     seckey = get_private_key(seckeypath, cb)
-    keys = [(0, seckey, recipient_pubkey)] # keys = list of (method, privkey, sender_pubkey=None)
+    keys = [(0, seckey, recipient_pubkey)] # keys = list of (method, privkey, recipient_pubkey=None)
 
     engine.encrypt(keys,
                    sys.stdin.buffer,
                    sys.stdout.buffer,
-                   start_coordinate = range_start,
-                   end_coordinate = range_end)
+                   offset = range_start,
+                   span = range_span)
 
 
 def decrypt(args):
@@ -147,7 +128,7 @@ def decrypt(args):
 
     sender_pubkey = get_public_key(os.path.expanduser(args['--sender_pk'])) if args['--sender_pk'] else None
 
-    range_start, range_end = parse_range(args)
+    range_start, range_span = parse_range(args)
 
     seckey = args['--sk'] or DEFAULT_SK
     seckeypath = os.path.expanduser(seckey)
@@ -163,18 +144,43 @@ def decrypt(args):
         cb = partial(getpass, prompt=f'Passphrase for {seckey}: ')
 
     seckey = get_private_key(seckeypath, cb)
-    keys = [(0, seckey, sender_pubkey)] # keys = list of (method, privkey, sender_pubkey=None)
+    keys = [(0, seckey, None)] # keys = list of (method, privkey, recipient_pubkey=None)
 
-    engine.decrypt(keys, # list of (method, privkey, sender_pubkey=None)
+    engine.decrypt(keys,
                    sys.stdin.buffer,
                    sys.stdout.buffer,
-                   start_coordinate = range_start,
-                   end_coordinate = range_end)
+                   offset = range_start,
+                   span = range_span,
+                   sender_pubkey=sender_pubkey)
 
 
 def rearrange(args):
     assert( args['rearrange'] )
-    raise NotImplementedError()
+
+    range_start, range_span = parse_range(args)
+
+    seckey = args['--sk'] or DEFAULT_SK
+    seckeypath = os.path.expanduser(seckey)
+    if not os.path.exists(seckeypath):
+        raise ValueError('Secret key not found')
+
+    passphrase = os.getenv('C4GH_PASSPHRASE')
+    if passphrase:
+        #LOG.warning("Using a passphrase in an environment variable is insecure")
+        print("Warning: Using a passphrase in an environment variable is insecure", file=sys.stderr)
+        cb = lambda : passphrase
+    else:
+        cb = partial(getpass, prompt=f'Passphrase for {seckey}: ')
+
+    seckey = get_private_key(seckeypath, cb)
+
+    keys = [(0, seckey, bytes(PrivateKey(seckey).public_key))] # keys = list of (method, privkey, recipient_pubkey=ourselves)
+
+    engine.rearrange(keys,
+                     sys.stdin.buffer,
+                     sys.stdout.buffer,
+                     offset = range_start,
+                     span = range_span)
 
 def reencrypt(args):
     assert( args['reencrypt'] )
@@ -197,7 +203,8 @@ def reencrypt(args):
     recipient_pubkey = get_public_key(os.path.expanduser(args['--recipient_pk']))
     sender_pubkey = get_public_key(os.path.expanduser(args['--sender_pk'])) if args['--sender_pk'] else None
 
-    engine.reencrypt([(0, seckey, sender_pubkey)], # recipient_keys
+    engine.reencrypt([(0, seckey, None)], # sender_keys
                      [(0, seckey, recipient_pubkey)], # recipient_keys
-                     sys.stdin.buffer, sys.stdout.buffer,
+                     sys.stdin.buffer,
+                     sys.stdout.buffer,
                      trim=args['--trim'])

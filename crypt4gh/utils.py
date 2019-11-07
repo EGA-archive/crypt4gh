@@ -74,79 +74,148 @@ def limited_output(offset=0, limit=None, process=None):
 def edit_list_oracle(edits):
     data_len = yield # first stop
 
-    skip = edits.popleft()
+    skip = edits.popleft() # must be there
     keep = edits.popleft() if edits else None
 
     while True:
 
+        # print('In this loop: skip:', skip, '| keep:', keep)
+
         #assert data_len, "You should not advance the generator with a 0-length"
-        while data_len <= 0:
+        if data_len <= 0:
             data_len = yield None
+            continue
+
+        # --------------------------------------
+        # First part: should we skip something ?
+        # --------------------------------------
 
         if data_len <= skip:
+            # print('skipping data_len', data_len, '| skip:', skip, '| keep:', keep)
             skip -= data_len
             data_len = yield None
             continue
 
+
+        # ---------------------------------------
+        # Second part: should we skip something ?
+        # ---------------------------------------
+
         # now data_len > skip so we should slice the data segment
+        #   |--------------------| data_len
+        #   |----|------- ?
+        #    skip   keep
 
         if keep is None: # to EOF
             # We should output to the end of the stream
             # Say yes all the time, except the first skip
             data_len = yield ([(skip, None)] if skip else [])
-            while True:
+            while True: # trapping the generator here
                 yield []
 
         # else, we should now read only some bytes
-        if data_len - skip <= keep: # we still have bytes to read
+        assert( keep > 0 )
+
+        while data_len <= skip + keep: # we still have bytes to read
+            #   |--------------------| data_len        |--------------------| data_len
+            #   |----|--------------------|            ||------------------------|
+            #    skip        keep                      skip=0       keep
+            # print('keeping data_len', data_len, '| skip:', skip, '| keep:', keep)
             keep -= (data_len-skip)
             data_len = yield ([(skip, None)] if skip else [])
             skip = 0
+            # we trap the generator here, instead of using "continue" (it should be the same)
 
-            while data_len <= keep:
-                keep -= data_len
-                data_len = yield [] # keep all
-                
 
-        # data_len >  skip + keep: we need to pull the other (skip,keep) from the edit list
-        pos = skip + keep
-        slices = [(skip, pos)] if pos else []
-
-        while True:
-
+        # print(f'Longer data_len {data_len} than bytes to keep. Need more (skip,keep) | skip: {skip} | keep: {keep}')
+        if keep == 0: # no more: exit or loop
+            # data_len matched skip+keep in the previous branch:
+            #   |--------------------| data_len
+            #   |----|---------------|
+            #    skip       keep
+            # in this case, skip and keep both become 0
+            # We can pull the new (skip,keep) and loop
             if not edits: 
-                if slices:
-                    yield slices
                 raise ProcessingOver() # game over
-
             skip = edits.popleft()
             assert( skip > 0 )
             keep = edits.popleft() if edits else None
+            continue # loop
 
-            if pos + skip < data_len: # we need to skip some part
-                if keep is None:
-                    slices.append( (pos+skip, None) )
-                    skip = 0
-                    break
+        assert(data_len > skip + keep)
+        # data_len >  skip + keep: we need to pull the other (skip,keep) from the edit list
+        #   |--------------------| old data_len
+        #   |----|-----------|
+        #    skip    keep
+        #                    |---| new data_len
 
-                if pos+skip+keep <= data_len:
-                    slices.append( (pos+skip, pos+skip+keep) )
-                    pos = pos + skip + keep
-                    # skip = 0
-                    continue
-                
-                # pos+skip+keep > data_len
-                keep -= (data_len - pos - skip)
-                skip = 0
-                # loop
+        # In this case, we consume (ie decrease) the data_len quantity, and remember pos (where we were)
+        pos = skip + keep
+        leftover = data_len - pos
+        slices = [(skip, pos)]
 
-            else:
+        while True:
+
+            # print('slices so far:', slices, '| leftover:', leftover)
+
+            # We can pull the new (skip,keep) and loop
+            skip = edits.popleft() if edits else None
+            keep = edits.popleft() if edits else None
+            assert( skip is None or (skip > 0 and (keep is None or keep > 0)) )
+
+            # print('New skip/keep:', skip, keep)
+
+            if skip is None: # game over
+                break
+
+            if leftover <= skip:
+                #   |-------| leftover
+                #   |-----------|-------- ?
+                #        skip      keep
                 # we don't add anything to the slices, and exit the while loop
                 # skip for the next coming data
-                skip -= (data_len - pos)
-                break
-                
+                skip -= leftover
+                break # finito
+
+            assert(leftover > skip)
+            #   |------------------| leftover
+            #   |----|-------- ?
+            #    skip    keep
+
+            # print('Still some leftover:', leftover, '| pos:',pos)
+
+            if keep is None: # final slice
+                slices.append( (pos+skip, None) )
+                skip = 0
+                break # finito
+
+            assert(keep > 0)
+
+            #   |------------------| leftover
+            #   |----|----------------|
+            #    skip    keep
+            # print(f'alright...... leftover {leftover} | skip {skip} | keep {keep}')
+            if leftover <= skip+keep:
+                slices.append( (pos+skip, None) )
+                keep -= (leftover - skip)
+                # print(f'new keep: {keep}')
+                if keep == 0: # pull more (skip,keep)
+                    continue
+                skip = 0
+                break # all data_len consumed
+
+            #   |--------------------| leftover
+            #   |----|----------|
+            #    skip    keep
+            slices.append( (pos+skip, pos+skip+keep) )
+            leftover -= (skip+keep)
+            pos += (skip+keep)
+
         data_len = yield slices
+
+        if skip is None:
+            raise ProcessingOver()
+
 
 
 if __name__ == '__main__':
@@ -169,7 +238,9 @@ if __name__ == '__main__':
         [1,1,1,1,1,1],
         [1,1,1,1,1,1,1],
 
-        [0, 65536],
+        [0, 65536, 1, 65536, 1, 65536],
+
+        [0, 65536, 1, 65536, 1, 1, 1, 1, 1, 65536, 1],
     ]
 
     import collections
@@ -177,7 +248,9 @@ if __name__ == '__main__':
     entire_file = [65536 for i in range(6)]
     entire_file.append(100)
 
+    #for edits in [all_edit_lists[-1]]:
     for edits in all_edit_lists:
+        print( "-"*30 )
         print( "Edit List: ", edits )
 
         edits = collections.deque(edits)
@@ -186,7 +259,9 @@ if __name__ == '__main__':
 
         try:
             for segment in entire_file:
-                print( f"Sending {segment} bytes | slices: ", oracle.send(segment) )
+                # print( f"\n++++++ Sending {segment} bytes")
+                # print(  "------ Slices: ", oracle.send(segment),"\n" )
+                print( f"Sending {segment} bytes | Slices: ", oracle.send(segment))
         except ProcessingOver:
             pass
 

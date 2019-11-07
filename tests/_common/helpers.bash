@@ -14,10 +14,3 @@ ALICE_SECKEY=${HERE}/alice.sec
 ALICE_PASSPHRASE=alice
 BOB_PASSPHRASE=bob
 
-# Convenience function to capture _all_ outputs
-function c4gh_run {
-    echo -e "+++ $@" >> ${BATS_TEST_FILENAME}.debug
-    run "$@"
-    echo -e "$output" >> ${BATS_TEST_FILENAME}.debug
-    echo -e "--- Status: $status" >> ${BATS_TEST_FILENAME}.debug
-}

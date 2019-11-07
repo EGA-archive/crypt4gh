@@ -1,6 +1,6 @@
 import logging
 
-from .header import parse_edit_list_packet
+#from .header import parse_edit_list_packet
 
 LOG = logging.getLogger(__name__)
 

@@ -127,7 +127,7 @@ def output(args):
 
     if edits is not None:
         LOG.debug(f'# Packet {edits[1]} Edit list: {edits[0].hex()}')
-        edit_list = header.parse_edit_list_packet(edits[0])
+        edit_list = list(header.parse_edit_list_packet(edits[0]))
         print(f'# Packet {edits[1]} Edit list: {edit_list}')
 
 

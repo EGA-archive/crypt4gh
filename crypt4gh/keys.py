@@ -134,12 +134,16 @@ def generate(seckey, pubkey, callback=None, comment=None):
     sk = PrivateKey.generate()
     LOG.debug('Private Key: %s', bytes(sk).hex().upper())
 
-    with open(pubkey, 'bw') as f:
+    os.umask(0o222) # Restrict to r-- r-- r--
+
+    with open(pubkey, 'bw', ) as f:
         f.write(b'-----BEGIN CRYPT4GH PUBLIC KEY-----\n')
         pkey = bytes(sk.public_key)
         LOG.debug('Public Key: %s', pkey.hex().upper())
         f.write(b64encode(pkey))
         f.write(b'\n-----END CRYPT4GH PUBLIC KEY-----\n')
+
+    os.umask(0o277) # Restrict to r-- --- ---
 
     with open(seckey, 'bw') as f:
         is_encrypted = False

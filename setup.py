@@ -4,7 +4,7 @@ assert sys.version_info >= (3, 6), "crypt4gh requires python 3.6 or higher"
 from setuptools import setup
 
 setup(name='crypt4gh',
-      version=1,
+      version=1.0,
       url='https://www.github.com/EGA-archive/crypt4gh',
       license='Apache License 2.0',
       author='Frédéric Haziza <frederic.haziza@crg.eu>',
@@ -24,11 +24,11 @@ setup(name='crypt4gh',
       platforms = 'any',
       python_requires='>=3.6',
       # See https://packaging.python.org/discussions/install-requires-vs-requirements/
-      install_requires=[ # Should add >=x.y.z for all
-          'pyYaml',
-          'docopt',
-          'cryptography',
-          'pynacl',
-          'bcrypt',
+      install_requires=[
+          'pyYaml>=5.1.2',
+          'docopt', # include version when needed
+          'cryptography>=2.8',
+          'pynacl>=1.3.0',
+          'bcrypt', # include version when needed
       ],
 )

@@ -11,7 +11,7 @@ from nacl.bindings import crypto_kx_client_session_keys, crypto_kx_server_sessio
 from nacl.public import PrivateKey
 from cryptography.exceptions import InvalidTag
 
-from . import __version__, SEGMENT_SIZE
+from . import SEGMENT_SIZE
 
 LOG = logging.getLogger(__name__)
 
@@ -27,6 +27,7 @@ LOG = logging.getLogger(__name__)
 # -------------------------------------
 
 MAGIC_NUMBER = b'crypt4gh'
+VERSION = 1
 
 def parse(stream):
     '''Parses a given stream, verifies it and returns header's encrypted part'''
@@ -42,7 +43,7 @@ def parse(stream):
 
     # Version, 4 bytes
     version = int.from_bytes(bytes(buf[8:12]), byteorder='little')
-    if version != __version__: # only version 1, so far
+    if version != VERSION: # only version 1, so far
         raise ValueError('Unsupported CRYPT4GH version')
 
     # Packets count
@@ -73,7 +74,7 @@ def serialize(packets):
     packets_count = len(packets)
     LOG.debug('Serializing the header (%d packets)', packets_count)
     return (MAGIC_NUMBER +
-            __version__.to_bytes(4,'little') +
+            VERSION.to_bytes(4,'little') +
             packets_count.to_bytes(4,'little') +
             b''.join( len(packet).to_bytes(4,'little') +
                       packet

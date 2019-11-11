@@ -37,7 +37,7 @@ cryptographic file format."""
 
 
 __title__ = 'GA4GH cryptographic utilities'
-__version__ = VERSION = 1
+__version__ = '1.0' # VERSION in header is 1 (as 4 bytes little endian)
 __author__ = 'Frédéric Haziza <frederic.haziza@crg.eu>'
 __license__ = 'Apache License 2.0'
 __copyright__ = __title__ + ' @ CRG'

@@ -87,7 +87,7 @@ def _decode_string(stream):
 
 def _derive_key(alg, passphrase, salt, rounds):
     if alg == b'scrypt':
-        return scrypt(passphrase, salt, 1<<14, 8, 1, dklen=32)
+        return scrypt(passphrase, salt=salt, n=1<<14, r=8, p=1, dklen=32)
     if alg == b'bcrypt':
         return bcrypt.kdf(passphrase, salt=salt, desired_key_bytes=32, rounds=rounds)
     if alg == b'pbkdf2_hmac_sha256':
@@ -100,7 +100,7 @@ def _derive_key(alg, passphrase, salt, rounds):
 #######################################################################
 
 _KDFS = {
-    b'scrypt': (16, None),
+    b'scrypt': (16, 0),
     b'bcrypt': (16, 100),
     b'pbkdf2_hmac_sha256': (16, 100000),
 }
@@ -257,6 +257,7 @@ def run(argv=sys.argv[1:]):
                     print('Ok. Fair enough. Exiting.')
                     #sys.exit(0)
                     return
+                os.remove(k)
                 
     do_crypt = not args['--nocrypt']
     cb = partial(getpass, prompt=f'Passphrase for {args["--sk"]}: ') if do_crypt else None

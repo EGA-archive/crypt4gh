@@ -53,6 +53,7 @@ Options:
    -C <comment>           Key's Comment
    --nocrypt              Do not encrypt the private key.
                           Otherwise it is encrypted in the Crypt4GH key format
+                          (See https://crypt4gh.readthedocs.io/en/latest/keys.html)
    -f                     Overwrite the destination files
 
 

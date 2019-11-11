@@ -3,22 +3,31 @@ assert sys.version_info >= (3, 6), "crypt4gh requires python 3.6 or higher"
 
 from setuptools import setup
 
+from crypt4gh import (__title__,
+                      __version__,
+                      __author__,
+                      __author_email__,
+                      __license__,
+                      __doc__ as crypt4gh_doc,
+                      PROG)
+
 setup(name='crypt4gh',
-      version=1.0,
+      version=__version__,
       url='https://www.github.com/EGA-archive/crypt4gh',
-      license='Apache License 2.0',
-      author='Frédéric Haziza <frederic.haziza@crg.eu>',
-      description='GA4GH cryptographic utilities',
-      long_description="""The crypt4gh package is an implementation to handle the GA4GH cryptographic file format.""",
+      license=__license__,
+      author=__author__,
+      author_email=__author_email__,
+      description=__title__,
+      long_description=crypt4gh_doc,
       packages=['crypt4gh'],
       include_package_data=False,
       package_data={ 'crypt4gh': ['completions'] },
       zip_safe=False,
       entry_points={
           'console_scripts': [
-              'crypt4gh=crypt4gh.__main__:main',
-              'crypt4gh-keygen=crypt4gh.keys:main',
-              'crypt4gh-debug=crypt4gh.debug:main',
+              f'{PROG}=crypt4gh.__main__:main',
+              f'{PROG}-keygen=crypt4gh.keys:main',
+              f'{PROG}-debug=crypt4gh.debug:main',
           ]
       },
       platforms = 'any',

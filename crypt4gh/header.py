@@ -11,7 +11,7 @@ from nacl.bindings import crypto_kx_client_session_keys, crypto_kx_server_sessio
 from nacl.public import PrivateKey
 from cryptography.exceptions import InvalidTag
 
-from . import SEGMENT_SIZE
+from . import SEGMENT_SIZE, VERSION
 
 LOG = logging.getLogger(__name__)
 
@@ -27,7 +27,6 @@ LOG = logging.getLogger(__name__)
 # -------------------------------------
 
 MAGIC_NUMBER = b'crypt4gh'
-VERSION = 1
 
 def parse(stream):
     '''Parses a given stream, verifies it and returns header's encrypted part'''

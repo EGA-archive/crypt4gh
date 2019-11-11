@@ -38,7 +38,8 @@ cryptographic file format."""
 
 __title__ = 'GA4GH cryptographic utilities'
 __version__ = '1.0' # VERSION in header is 1 (as 4 bytes little endian)
-__author__ = 'Frédéric Haziza <frederic.haziza@crg.eu>'
+__author__ = 'Frédéric Haziza'
+__author_email__ = 'frederic.haziza@crg.eu'
 __license__ = 'Apache License 2.0'
 __copyright__ = __title__ + ' @ CRG'
 
@@ -49,44 +50,8 @@ import logging
 LOG = logging.getLogger(__name__)
 
 # For this verion: Data blocks are bounded to that specific size
+VERSION = 1
 SEGMENT_SIZE = 65536
 
 
 
-##############################################################
-##
-##    Decorator for Error Handling
-##
-##############################################################
-import errno
-from nacl.exceptions import InvalidkeyError, BadSignatureError, CryptoError
-from cryptography.exceptions import InvalidTag
-
-def convert_error(func):
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except (InvalidkeyError, BadSignatureError, CryptoError) as e:
-            LOG.error('Converting Crypto errors')
-            raise ValueError('Crypt4GH Crypto Error') from e
-    return wrapper
-
-def close_on_broken_pipe(func):
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except (IOError) as e:
-            if e.errno == errno.EPIPE:
-                LOG.error('Closing on Broken Pipe')
-            # raise ValueError(f'Crypt4GH Error: {e}') from e
-    return wrapper
-
-def exit_on_invalid_passphrase(func):
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except (InvalidTag) as e:
-            LOG.error('Exiting for %r', e)
-            print('Invalid Key or Passphrase', file=sys.stderr)
-            sys.exit(2)
-    return wrapper

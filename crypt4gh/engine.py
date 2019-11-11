@@ -15,7 +15,7 @@ from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 from cryptography.exceptions import InvalidTag
 
 from . import SEGMENT_SIZE
-from . import convert_error, close_on_broken_pipe
+from .exceptions import convert_error, close_on_broken_pipe
 from . import header, utils
 
 LOG = logging.getLogger(__name__)

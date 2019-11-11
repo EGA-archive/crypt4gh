@@ -26,8 +26,8 @@ from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 from docopt import docopt
 
 
-from . import exit_on_invalid_passphrase
 from . import __title__, __version__, PROG
+from .exceptions import exit_on_invalid_passphrase
 
 LOG = logging.getLogger(__name__)
 

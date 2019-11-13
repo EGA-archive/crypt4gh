@@ -42,3 +42,15 @@ We use the testfile and Bob encrypts it for himself.
       Alice decrypts what she receives
       Expected outcome: Alice reads `Let's have beers in the sauna! or Dinner at 7pm?`.
 
+
+## Using SSH keys
+
+
+- [x] Bob encrypts a 10MB file for Alice, using its own SSH keypair, and Alice decrypts it, using her Crypt4GH keypair<br/>
+      Expected outcome: Alice reads the same content as Bob had.
+
+- [x] Bob encrypts a 10MB file for Alice, using its own Crypt4GH keypair, and Alice decrypts it, using her SSH keypair<br/>
+      Expected outcome: Alice reads the same content as testfile.
+
+- [x] Bob encrypts a 10MB file for Alice, and Alice decrypts it, both using their SSH keypair<br/>
+      Expected outcome: Alice reads the same content as testfile.

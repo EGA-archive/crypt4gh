@@ -20,6 +20,8 @@ function teardown() {
     run dd if=/dev/urandom bs=1m count=10 of=$TESTFILES/random.10MB
     [ "$status" -eq 0 ]
 
+    rm -f $TESTFILES/bob.sshkey{,.pub}
+
     # Bob creates an ssh-key (OpenSSH 6.5+)
     run ssh-keygen -t ed25519 -f $TESTFILES/bob.sshkey -N "${BOB_PASSPHRASE}"
     # Yeah, same passphrase, not very good, but good enough
@@ -45,6 +47,8 @@ function teardown() {
     run dd if=/dev/urandom bs=1m count=10 of=$TESTFILES/random.10MB
     [ "$status" -eq 0 ]
 
+    rm -f $TESTFILES/alice.sshkey{,.pub}
+
     # Bob creates an ssh-key (OpenSSH 6.5+)
     run ssh-keygen -t ed25519 -f $TESTFILES/alice.sshkey -N "${ALICE_PASSPHRASE}"
     # Yeah, same passphrase, not very good, but good enough
@@ -69,6 +73,9 @@ function teardown() {
     # Generate a random 10 MB file, and keep it
     run dd if=/dev/urandom bs=1m count=10 of=$TESTFILES/random.10MB
     [ "$status" -eq 0 ]
+
+    # Clean up
+    rm -f $TESTFILES/{bob,alice}.sshkey{,.pub}
 
     # Bob and Alice creates an ssh-key (OpenSSH 6.5+)
     run ssh-keygen -t ed25519 -f $TESTFILES/bob.sshkey -N "${BOB_PASSPHRASE}"

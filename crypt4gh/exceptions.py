@@ -3,9 +3,15 @@
 ##    Decorator for Error Handling
 ##
 ##############################################################
+
+import sys
+import logging
 import errno
+
 from nacl.exceptions import InvalidkeyError, BadSignatureError, CryptoError
 from cryptography.exceptions import InvalidTag
+
+LOG = logging.getLogger(__name__)
 
 def convert_error(func):
     def wrapper(*args, **kwargs):

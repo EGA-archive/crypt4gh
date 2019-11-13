@@ -37,6 +37,6 @@ Crypt4gh Keys
 *************
 
 .. automodule:: crypt4gh.keys
-   :members: generate, get_public_key, get_private_key
+   :members: get_public_key, get_private_key
 
 :ref:`genindex` | :ref:`modindex`

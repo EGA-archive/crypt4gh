@@ -44,6 +44,9 @@ Options:
 Environment variables:
    C4GH_LOG         If defined, it will be used as the default logger
    C4GH_SECRET_KEY  If defined, it will be used as the default secret key (ie --sk ${{C4GH_SECRET_KEY}})
+   C4GH_PASSPHRASE  If defined, it will be used as the passphrase
+                    for decoding the secret key, replacing the callback.
+                    Note: this is insecure. Only used for testing
  
 '''
 

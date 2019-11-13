@@ -24,8 +24,8 @@ import crypt4gh
 # ones.
 extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.autosummary',
-              'sphinx.ext.coverage',
-              'sphinx.ext.ifconfig',
+              #'sphinx.ext.coverage',
+              #'sphinx.ext.ifconfig',
               'sphinx.ext.viewcode',
               'sphinx.ext.githubpages',
               'sphinx.ext.todo',

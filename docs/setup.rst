@@ -33,7 +33,7 @@ We use `BATS <https://github.com/bats-core/bats-core>`_ to run the testsuite (so
     pip install -r crypt4gh/requirements.txt
     bats crypt4gh/tests
 
-which should output:
+which should output, something along those lines (yes, the testsuite might grow):
 
 .. code-block:: console
 
@@ -43,5 +43,8 @@ which should output:
    ✓ Bob sends only the Bs from the testfile secretly to Alice
    ✓ Bob sends one A, all Bs, one C, from the testfile secretly to Alice
    ✓ Bob rearranges the encrypted testfile to send one A, all Bs, one C, to Alice
+   ✓ Bob sends only the Bs from the testfile secretly to Alice
+   ✓ Bob sends one A, all Bs, one C, from the testfile secretly to Alice
+   ✓ Bob rearranges the encrypted testfile to send one A, all Bs, one C, to Alice
    
-   6 tests, 0 failures
+   10 tests, 0 failures

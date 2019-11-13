@@ -33,10 +33,10 @@ def encode_private_key(key, passphrase, comment):
     if passphrase is None:
         print(f'WARNING: The private key is not encrypted', file=sys.stderr)
         return (MAGIC_WORD + 
-	        encode_string(None) +
-	        encode_string(None) + 
-	        encode_string(bytes(key)) + 
-	        (encode_string(comment) if comment is not None else b''))
+	        encode_string(None) + # kdf = none (no kdfoptions)
+	        encode_string(None) + # cipher = none
+	        encode_string(bytes(key)) + # clear key material
+	        (encode_string(comment) if comment is not None else b'')) # optional comment
 
     # We have a passphrase: we encrypt the private key
     global KDFs, scrypt_supported
@@ -54,11 +54,11 @@ def encode_private_key(key, passphrase, comment):
     LOG.debug('      Nonce: %s', nonce.hex().upper())
     
     return (MAGIC_WORD + 
-	    encode_string(kdfname) +
-            encode_string(rounds.to_bytes(4,'big') + salt) +
-	    encode_string(b'chacha20_poly1305') + 
-	    encode_string(nonce + encrypted_key) + 
-	    (encode_string(comment) if comment is not None else b''))
+	    encode_string(kdfname) + # kdf
+            encode_string(rounds.to_bytes(4,'big') + salt) + # kdf options
+	    encode_string(b'chacha20_poly1305') +  # cipher
+	    encode_string(nonce + encrypted_key) +  # encrypted key material
+	    (encode_string(comment) if comment is not None else b'')) # optional comment
 
 
 def generate(seckey, pubkey, callback=None, comment=None):

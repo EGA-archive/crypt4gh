@@ -27,7 +27,7 @@ DEFAULT_SK  = os.getenv('C4GH_SECRET_KEY', '~/.c4gh/key')
 
 __doc__ = f'''
  
-Utility for the cryptographic GA4GH standard, reading from stdin and outputting to stdout.
+Utility to create Crypt4GH-formatted keys.
 
 Usage:
    {PROG}-keygen [-hv] [--log <file>] [-f] [--pk <path>] [--sk <path>] [--nocrypt] [-C <comment>]
@@ -49,9 +49,6 @@ Environment variables:
    C4GH_LOG         If defined, it will be used as the default logger
    C4GH_PUBLIC_KEY  If defined, it will be used as the default public key (ie --pk ${{C4GH_PUBLIC_KEY}})
    C4GH_SECRET_KEY  If defined, it will be used as the default secret key (ie --sk ${{C4GH_SECRET_KEY}})
-   C4GH_PASSPHRASE  If defined, it will be used as the passphrase
-                    for decoding the secret key, replacing the callback.
-                    Note: this is insecure. Only used for testing
  
 '''
 

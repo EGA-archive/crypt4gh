@@ -176,6 +176,40 @@ def decrypt_block(ciphersegment, ciphers):
         raise ValueError('Could not decrypt that block')
 
 
+def body_decrypt(infile, ciphers, edit_packet, output):
+
+    if edit_packet is None:
+        for ciphersegment in cipher_chunker(infile, CIPHER_SEGMENT_SIZE):
+            segment = decrypt_block(ciphersegment, ciphers)
+            output.send(segment)
+    else:
+
+        edits = collections.deque(header.parse_edit_list_packet(edit_packet))
+        LOG.debug('Edit List: %s', edits)
+        oracle = utils.edit_list_oracle(edits)
+        next(oracle) # start it
+
+        for i, ciphersegment in enumerate(cipher_chunker(infile, CIPHER_SEGMENT_SIZE)):
+
+            segment_len = len(ciphersegment) - CIPHER_DIFF
+            slices = oracle.send(segment_len)
+            if slices is None:
+                LOG.warning('Cipherblock %d is entirely skipped', i)
+                continue
+
+            LOG.debug('Edit List slices: %s', slices)
+            segment = decrypt_block(ciphersegment, ciphers)
+            if slices == []: # no slices use all of it
+                output.send(segment)
+                continue
+
+            assert (all( (y is None or x < y)  for x,y in slices)
+                    and
+                    all( slices[i][1] < slices[i+1][0] for i in range(len(slices)-1))
+            ), f"Invalid slices: {slices}"
+            for (x,y) in slices:
+                output.send(segment[x:] if y is None else segment[x:y]) # no copy if x=0, here!
+
 
 @close_on_broken_pipe
 def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
@@ -223,42 +257,7 @@ def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
     next(output) # start it
 
     try:
-        if edit_packet is None:
-            for ciphersegment in cipher_chunker(infile, CIPHER_SEGMENT_SIZE):
-                segment = decrypt_block(ciphersegment, ciphers)
-                output.send(segment)
-        else:
-
-
-            edits = collections.deque(header.parse_edit_list_packet(edit_packet))
-            LOG.debug('Edit List: %s', edits)
-            oracle = utils.edit_list_oracle(edits)
-            next(oracle) # start it
-
-            for i, ciphersegment in enumerate(cipher_chunker(infile, CIPHER_SEGMENT_SIZE)):
-
-                segment_len = len(ciphersegment) - CIPHER_DIFF
-                slices = oracle.send(segment_len)
-                if slices is None:
-                    LOG.warning('Cipherblock %d is entirely skipped', i)
-                    continue
-
-                LOG.debug('Edit List slices: %s', slices)
-                segment = decrypt_block(ciphersegment, ciphers)
-                LOG.debug('(------------------ HI OSCAR: %d == %d', id(slices), id([]))
-                if slices == []: # no slices use all of it
-                    LOG.debug('(------------------ HI OSCAR')
-                    output.send(segment)
-                    LOG.debug('(------------------ HI OSCAR')
-                    continue
-
-                assert (all( (y is None or x < y)  for x,y in slices)
-                        and
-                        all( slices[i][1] < slices[i+1][0] for i in range(len(slices)-1))
-                ), f"Invalid slices: {slices}"
-                for (x,y) in slices:
-                    output.send(segment[x:] if y is None else segment[x:y]) # no copy if x=0, here!
-
+        body_decrypt(ciphers, edit_packet, output)
     except utils.ProcessingOver:
         pass
 

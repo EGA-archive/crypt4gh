@@ -21,7 +21,7 @@ DEFAULT_SK  = os.getenv('C4GH_SECRET_KEY', '~/.c4gh/key')
 DEFAULT_LOG = os.getenv('C4GH_LOG', None)
 
 __doc__ = f'''
- 
+
 Utility for the cryptographic GA4GH standard, reading from stdin and outputting to stdout.
 
 Usage:

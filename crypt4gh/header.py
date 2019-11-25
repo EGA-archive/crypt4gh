@@ -52,7 +52,7 @@ def parse(stream):
     # Spit out one packet at a time
     for i in range(packets_count):
         LOG.debug('========== Packet %d', i)
-        encrypted_packet_len = int.from_bytes(stream.read(4), byteorder='little')
+        encrypted_packet_len = int.from_bytes(stream.read(4), byteorder='little') - 4 # include packet_len itself
         LOG.debug('packet length: %d', encrypted_packet_len)
         if encrypted_packet_len < 0:
             raise ValueError(f'Invalid packet length {encrypted_packet_len}')
@@ -75,7 +75,7 @@ def serialize(packets):
     return (MAGIC_NUMBER +
             VERSION.to_bytes(4,'little') +
             packets_count.to_bytes(4,'little') +
-            b''.join( len(packet).to_bytes(4,'little') +
+            b''.join( (len(packet) + 4).to_bytes(4,'little') +
                       packet
                       for packet in packets ))
 

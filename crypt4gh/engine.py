@@ -21,6 +21,7 @@ from . import header, utils
 LOG = logging.getLogger(__name__)
 
 CIPHER_DIFF = 28
+CIPHER_SEGMENT_SIZE = SEGMENT_SIZE + CIPHER_DIFF
 
 # Encryption Methods Conventions
 # ------------------------------
@@ -39,7 +40,7 @@ CIPHER_DIFF = 28
 def _encrypt_segment(data, process, cipher):
     '''Utility function to generate a nonce, encrypt data with Chacha20, and authenticate it with Poly1305.'''
 
-    LOG.debug("Segment [%d bytes]: %s..%s", len(data), data[:10], data[-10:])
+    #LOG.debug("Segment [%d bytes]: %s..%s", len(data), data[:10], data[-10:])
 
     nonce = os.urandom(12)
     encrypted_data = cipher.encrypt(nonce, data, None)  # No add
@@ -241,8 +242,6 @@ def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
     # Parse returns the session key (since it should be method 0) 
     ciphers = [ChaCha20Poly1305(header.parse_enc_packet(packet)) for packet in data_packets]
 
-    CIPHER_SEGMENT_SIZE = SEGMENT_SIZE + CIPHER_DIFF
-                
     if edit_packet is None:
         # In this case, we try to fast-forward, and adjust the offset
         if offset > 0:
@@ -257,7 +256,7 @@ def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
     next(output) # start it
 
     try:
-        body_decrypt(ciphers, edit_packet, output)
+        body_decrypt(infile, ciphers, edit_packet, output)
     except utils.ProcessingOver:
         pass
 

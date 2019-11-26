@@ -17,7 +17,7 @@ function teardown() {
 @test "Bob sends a secret (random) 10MB file to Alice" {
 
     # Generate a random 10 MB file, and keep it
-    run dd if=/dev/urandom bs=1m count=10 of=$TESTFILES/random.10MB
+    run dd if=/dev/urandom bs=1048576 count=10 of=$TESTFILES/random.10MB
     [ "$status" -eq 0 ]
 
     # Bob encrypts it for Alice
@@ -26,7 +26,7 @@ function teardown() {
 
     # Alice decrypts it
     export C4GH_PASSPHRASE=${ALICE_PASSPHRASE}
-    crypt4gh decrypt --sk ${ALICE_SECKEY} < $TESTFILES/random.10MB.c4GH > $TESTFILES/random.10MB.received
+    crypt4gh decrypt --sk ${ALICE_SECKEY} < $TESTFILES/random.10MB.c4gh > $TESTFILES/random.10MB.received
 
     run diff $TESTFILES/random.10MB $TESTFILES/random.10MB.received
     [ "$status" -eq 0 ]

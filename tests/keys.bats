@@ -14,7 +14,7 @@ function teardown() {
     rm -rf ${TESTFILES}
 }
 
-@test "Bob sends a secret (random) 10MB file to Alice, using its ssh-key" {
+@test "Bob sends a secret (random) 10MB file to Alice, using his ssh-key" {
 
     # Generate a random 10 MB file, and keep it
     run dd if=/dev/urandom bs=1048576 count=10 of=$TESTFILES/random.10MB

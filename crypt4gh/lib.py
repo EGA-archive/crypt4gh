@@ -16,7 +16,7 @@ from cryptography.exceptions import InvalidTag
 
 from . import SEGMENT_SIZE
 from .exceptions import convert_error, close_on_broken_pipe
-from . import header, utils
+from . import header
 
 LOG = logging.getLogger(__name__)
 
@@ -176,47 +176,186 @@ def decrypt_block(ciphersegment, ciphers):
     else: # no cipher worked: Bark!
         raise ValueError('Could not decrypt that block')
 
+class ProcessingOver(Exception):
+    pass
+
+def limited_output(offset=0, limit=None, process=None):
+    '''Generator that receives clear text and does not process more than limit bytes (if limit is not None).
+
+    Raises ProcessingOver if the limit is reached'''
+
+    LOG.debug('Slicing from %s | Keeping %s bytes', offset, 'all' if limit is None else limit)
+
+    if not callable(process):
+        raise ValueError('process_output is not callable')
+
+    assert( 
+        (isinstance(offset, int) and offset >= 0)
+        and
+        (limit is None
+         or
+         (isinstance(limit, int) and limit > 0))
+    )
+
+    while True:
+        data = yield
+        data_len = len(data)
+
+        if data_len < offset: # not enough data to chop off
+            offset -= data_len
+            continue # ignore output
+
+        if limit is None:
+            process(data[offset:])  # no copying here if offset=0!
+        else:
+
+            if limit < (data_len - offset): # should stop early
+                process(data[offset:limit+offset])
+                raise ProcessingOver()
+            else:
+                process(data[offset:])  # no copying here if offset=0!
+                limit -= (data_len - offset)
+
+        offset = 0 # reset offset
+
 
 def body_decrypt(infile, ciphers, output, offset):
+    """Decrypt the whole data portion.
+
+    We fast-forward if offset >= SEGMENT_SIZE.
+    We decrypt until the first one occurs:
+    * `output` reaches its end
+    * `infile` reaches its end."""
 
     # In this case, we try to fast-forward, and adjust the offset
     if offset >= SEGMENT_SIZE: 
         start_segment, offset = divmod(offset, SEGMENT_SIZE)
-        LOG.info('Fast-forwarding %d segment', start_segment)
+        LOG.warning('Fast-forwarding %d segments', start_segment)
         start_ciphersegment = start_segment * CIPHER_SEGMENT_SIZE
         infile.seek(start_ciphersegment, io.SEEK_CUR)  # move forward
 
-    for ciphersegment in cipher_chunker(infile, CIPHER_SEGMENT_SIZE):
-        segment = decrypt_block(ciphersegment, ciphers)
-        output.send(segment)
-
-def body_decrypt_parts(infile, ciphers, output, edit_list):
-
-    edits = collections.deque(edit_list)
-    LOG.debug('Edit List: %s', edits)
-    oracle = utils.edit_list_oracle(edits)
-    next(oracle) # start it
-    
-    for i, ciphersegment in enumerate(cipher_chunker(infile, CIPHER_SEGMENT_SIZE)):
-        
-        segment_len = len(ciphersegment) - CIPHER_DIFF
-        slices = oracle.send(segment_len)
-        if slices is None:
-            LOG.warning('Cipherblock %d is entirely skipped', i)
-            continue
-        
-        LOG.debug('Edit List slices: %s', slices)
-        segment = decrypt_block(ciphersegment, ciphers)
-        if slices == []: # no slices use all of it
+    try:
+        for ciphersegment in cipher_chunker(infile, CIPHER_SEGMENT_SIZE):
+            segment = decrypt_block(ciphersegment, ciphers)
             output.send(segment)
-            continue
+    except ProcessingOver:  # output raised it
+        pass
+
+
+class DecryptedBuffer():
+    def __init__(self, fileobj, ciphers, output):
+        self.fileobj = fileobj
+        self.ciphers = ciphers
+        self.buf = io.BytesIO()
+        self.block = 0  # just used for printing, if that block is entirely skipped
+        self.output = output
+
+    def _append_to_buf(self, data):
+        assert( data ), "Why are you adding 'nothing'?"
+        oldpos = self.buf.tell()
+        self.buf.seek(0, os.SEEK_END)
+        self.buf.write(data)
+        self.buf.seek(oldpos)
+
+    def buf_size(self):
+        oldpos = self.buf.tell()
+        self.buf.seek(0, os.SEEK_END)
+        size = self.buf.tell() - oldpos
+        self.buf.seek(oldpos)
+        return size
+
+    def _fetch(self, nodecrypt=False):
+        """Populate the internal buffer with data.
+
+        Advances the underlying file object by one cipher chunk.
+        Decrypts the bytes only if nodecrypt is False, otherwise, outputs a warning for block entirely skipped.
+
+        Raises ProcessingOver if no more data to pull, so make sure to process the buffer before calling this function.
+        """
+        LOG.debug('Pulling one segment | Buffer size: %d', self.buf_size())
+        data = self.fileobj.read(CIPHER_SEGMENT_SIZE)
+        if not data:
+            raise ProcessingOver("No more data to read")
+        self.block += 1
+        if nodecrypt:
+            LOG.warning('Block %d is entirely skipped', self.block)
+            return
+        # else, we decrypt
+        LOG.debug('Decrypting block %d', self.block)
+        assert( len(data) > CIPHER_DIFF )
+        segment = decrypt_block(data, self.ciphers)
+        LOG.debug('Adding %d bytes to the buffer', len(segment))
+        self._append_to_buf(segment)
+        LOG.debug('Buffer size: %d', self.buf_size())
         
-        assert (all( (y is None or x < y)  for x,y in slices)
-                and
-                all( slices[i][1] < slices[i+1][0] for i in range(len(slices)-1))
-        ), f"Invalid slices: {slices}"
-        for (x,y) in slices:
-            output.send(segment[x:] if y is None else segment[x:y]) # no copy if x=0, here!
+    def skip(self, size):
+        """Skip size bytes."""
+        assert(size > 0)
+        LOG.debug('Skipping %d bytes | Buffer size: %d', size, self.buf_size())
+
+        while size > 0:
+            # Empty the buffer
+            LOG.debug('Left to skip: %d | Buffer size: %d', size, self.buf_size())
+            b = self.buf.read(size)
+            size -= len(b)
+            if size > 0:  # more to skip
+                if size > SEGMENT_SIZE:
+                    self._fetch(nodecrypt=True)
+                    size -= SEGMENT_SIZE
+                else:
+                    self._fetch(nodecrypt=False)
+
+    def read(self, size):
+        """Read size bytes."""
+        assert(size > 0)
+        LOG.debug('Reading %d bytes | Buffer size: %d', size, self.buf_size())
+            
+        b = self.buf.read(size)
+        if b:
+            LOG.debug('Processing %d bytes | Buffer size: %d', len(b), self.buf_size())
+            self.output.send(b)
+        size -= len(b)
+
+        while size > 0:  # some bytes are missing in the buffer. Go go gadget fetch more blocks
+            LOG.debug('Left to read: %d | Buffer size: %d', size, self.buf_size())
+            self._fetch(nodecrypt=False)
+            b2 = self.buf.read(size)
+            if b2:
+                LOG.debug('Processing %d bytes | Buffer size: %d', len(b2), self.buf_size())
+                self.output.send(b2)
+            assert( b2 )
+            size -= len(b2)
+
+
+def body_decrypt_parts(infile, ciphers, output, edit_list=None):
+    """Decrypt the data portion according to the edit list.
+
+    We do not decrypt segments that are entirely skipped, and only output a warning (that it should not be the case).
+    We decrypt until the end of infile."""
+
+    # assert(edit_list is not None), "You can not call this function without an edit_list"
+    # LOG.debug('Edit List: %s', edit_list)
+
+    decrypted = DecryptedBuffer(infile, ciphers, output)
+
+    try:
+
+        skip = True  # first one is skip
+        for edit_length in edit_list:
+            # Read/Skip a big chunk
+            _apply = decrypted.skip if skip else decrypted.read
+            _apply(edit_length)
+            # Now flip it and go to the next length
+            skip = not skip
+
+        if not skip:
+            # We finished the edit list with a skip
+            # read now until the end
+            while True:
+                segment = decrypted.read(SEGMENT_SIZE)
+
+    except ProcessingOver:
+        pass
 
 
 @close_on_broken_pipe
@@ -244,18 +383,16 @@ def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
     # Infile in now positioned at the beginning of the data portion
 
     # Generator to slice the output
-    output = utils.limited_output(offset=offset, limit=span, process=outfile.write)
+    output = limited_output(offset=offset, limit=span, process=outfile.write)
     next(output) # start it
 
-    try:
-        if edit_list is None:
-            # No edit list: decrypt all segments until the end
-            body_decrypt(infile, ciphers, output, offset)
-        else:
-            # Edit list: it drives which segments is decrypted
-            body_decrypt_parts(infile, ciphers, output, edit_list)
-    except utils.ProcessingOver:
-        pass
+    if edit_list is None:
+        # No edit list: decrypt all segments until the end
+        body_decrypt(infile, ciphers, output, offset)
+        # We could use body_decrypt_parts but there is an inner buffer, and segments might not be aligned
+    else:
+        # Edit list: it drives which segments is decrypted
+        body_decrypt_parts(infile, ciphers, output, edit_list=list(edit_list))
 
     LOG.info('Decryption Over')
 

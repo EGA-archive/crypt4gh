@@ -15,7 +15,7 @@ from getpass import getpass
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
 from crypt4gh.keys import get_private_key, get_public_key
-from crypt4gh import header,engine, SEGMENT_SIZE
+from crypt4gh import header,lib, SEGMENT_SIZE
 
 if __name__ == '__main__':
 
@@ -99,10 +99,10 @@ if __name__ == '__main__':
 
         if segment_len < SEGMENT_SIZE: # not a full segment
             data = bytes(segment[:segment_len]) # to discard the bytes from the previous segments
-            engine._encrypt_segment(data, outfile.write, cipher)
+            lib._encrypt_segment(data, outfile.write, cipher)
             break
 
         data = bytes(segment) # this is a full segment
-        engine._encrypt_segment(data, outfile.write, cipher)
+        lib._encrypt_segment(data, outfile.write, cipher)
 
 

@@ -177,39 +177,46 @@ def decrypt_block(ciphersegment, ciphers):
         raise ValueError('Could not decrypt that block')
 
 
-def body_decrypt(infile, ciphers, edit_packet, output):
+def body_decrypt(infile, ciphers, output, offset):
 
-    if edit_packet is None:
-        for ciphersegment in cipher_chunker(infile, CIPHER_SEGMENT_SIZE):
-            segment = decrypt_block(ciphersegment, ciphers)
+    # In this case, we try to fast-forward, and adjust the offset
+    if offset >= SEGMENT_SIZE: 
+        start_segment, offset = divmod(offset, SEGMENT_SIZE)
+        LOG.info('Fast-forwarding %d segment', start_segment)
+        start_ciphersegment = start_segment * CIPHER_SEGMENT_SIZE
+        infile.seek(start_ciphersegment, io.SEEK_CUR)  # move forward
+
+    for ciphersegment in cipher_chunker(infile, CIPHER_SEGMENT_SIZE):
+        segment = decrypt_block(ciphersegment, ciphers)
+        output.send(segment)
+
+def body_decrypt_parts(infile, ciphers, output, edit_list):
+
+    edits = collections.deque(edit_list)
+    LOG.debug('Edit List: %s', edits)
+    oracle = utils.edit_list_oracle(edits)
+    next(oracle) # start it
+    
+    for i, ciphersegment in enumerate(cipher_chunker(infile, CIPHER_SEGMENT_SIZE)):
+        
+        segment_len = len(ciphersegment) - CIPHER_DIFF
+        slices = oracle.send(segment_len)
+        if slices is None:
+            LOG.warning('Cipherblock %d is entirely skipped', i)
+            continue
+        
+        LOG.debug('Edit List slices: %s', slices)
+        segment = decrypt_block(ciphersegment, ciphers)
+        if slices == []: # no slices use all of it
             output.send(segment)
-    else:
-
-        edits = collections.deque(header.parse_edit_list_packet(edit_packet))
-        LOG.debug('Edit List: %s', edits)
-        oracle = utils.edit_list_oracle(edits)
-        next(oracle) # start it
-
-        for i, ciphersegment in enumerate(cipher_chunker(infile, CIPHER_SEGMENT_SIZE)):
-
-            segment_len = len(ciphersegment) - CIPHER_DIFF
-            slices = oracle.send(segment_len)
-            if slices is None:
-                LOG.warning('Cipherblock %d is entirely skipped', i)
-                continue
-
-            LOG.debug('Edit List slices: %s', slices)
-            segment = decrypt_block(ciphersegment, ciphers)
-            if slices == []: # no slices use all of it
-                output.send(segment)
-                continue
-
-            assert (all( (y is None or x < y)  for x,y in slices)
-                    and
-                    all( slices[i][1] < slices[i+1][0] for i in range(len(slices)-1))
-            ), f"Invalid slices: {slices}"
-            for (x,y) in slices:
-                output.send(segment[x:] if y is None else segment[x:y]) # no copy if x=0, here!
+            continue
+        
+        assert (all( (y is None or x < y)  for x,y in slices)
+                and
+                all( slices[i][1] < slices[i+1][0] for i in range(len(slices)-1))
+        ), f"Invalid slices: {slices}"
+        for (x,y) in slices:
+            output.send(segment[x:] if y is None else segment[x:y]) # no copy if x=0, here!
 
 
 @close_on_broken_pipe
@@ -232,31 +239,21 @@ def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
         )
     )
 
-    header_packets = header.parse(infile)
-    packets, _ = header.decrypt(header_packets, keys, sender_pubkey=sender_pubkey)
+    ciphers, edit_list = header.deconstruct(infile, keys, sender_pubkey=sender_pubkey)
 
-    if not packets: # no packets were decrypted
-        raise ValueError('No supported encryption method')
-
-    data_packets, edit_packet = header.partition_packets(packets)
-    # Parse returns the session key (since it should be method 0) 
-    ciphers = [ChaCha20Poly1305(header.parse_enc_packet(packet)) for packet in data_packets]
-
-    if edit_packet is None:
-        # In this case, we try to fast-forward, and adjust the offset
-        if offset > 0:
-            start_segment, offset = divmod(offset, SEGMENT_SIZE)
-            if start_segment: # not 0
-                LOG.info('Fast-forwarding %d segment', start_segment)
-                start_ciphersegment = start_segment * CIPHER_SEGMENT_SIZE
-                infile.seek(start_ciphersegment, io.SEEK_CUR)  # move forward
+    # Infile in now positioned at the beginning of the data portion
 
     # Generator to slice the output
     output = utils.limited_output(offset=offset, limit=span, process=outfile.write)
     next(output) # start it
 
     try:
-        body_decrypt(infile, ciphers, edit_packet, output)
+        if edit_list is None:
+            # No edit list: decrypt all segments until the end
+            body_decrypt(infile, ciphers, output, offset)
+        else:
+            # Edit list: it drives which segments is decrypted
+            body_decrypt_parts(infile, ciphers, output, edit_list)
     except utils.ProcessingOver:
         pass
 

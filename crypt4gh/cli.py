@@ -12,7 +12,7 @@ from docopt import docopt
 from nacl.public import PrivateKey
 
 from . import __title__, __version__, PROG
-from . import engine
+from . import lib
 from .keys import get_public_key, get_private_key
 
 LOG = logging.getLogger(__name__)
@@ -119,12 +119,12 @@ def encrypt(args):
     seckey = get_private_key(seckeypath, cb)
     keys = [(0, seckey, recipient_pubkey)] # keys = list of (method, privkey, recipient_pubkey=None)
 
-    engine.encrypt(keys,
-                   sys.stdin.buffer,
-                   sys.stdout.buffer,
-                   offset = range_start,
-                   span = range_span)
-
+    lib.encrypt(keys,
+                sys.stdin.buffer,
+                sys.stdout.buffer,
+                offset = range_start,
+                span = range_span)
+    
 
 def decrypt(args):
     assert( args['decrypt'] )
@@ -149,12 +149,12 @@ def decrypt(args):
     seckey = get_private_key(seckeypath, cb)
     keys = [(0, seckey, None)] # keys = list of (method, privkey, recipient_pubkey=None)
 
-    engine.decrypt(keys,
-                   sys.stdin.buffer,
-                   sys.stdout.buffer,
-                   offset = range_start,
-                   span = range_span,
-                   sender_pubkey=sender_pubkey)
+    lib.decrypt(keys,
+                sys.stdin.buffer,
+                sys.stdout.buffer,
+                offset = range_start,
+                span = range_span,
+                sender_pubkey=sender_pubkey)
 
 
 def rearrange(args):
@@ -179,11 +179,11 @@ def rearrange(args):
 
     keys = [(0, seckey, bytes(PrivateKey(seckey).public_key))] # keys = list of (method, privkey, recipient_pubkey=ourselves)
 
-    engine.rearrange(keys,
-                     sys.stdin.buffer,
-                     sys.stdout.buffer,
-                     offset = range_start,
-                     span = range_span)
+    lib.rearrange(keys,
+                  sys.stdin.buffer,
+                  sys.stdout.buffer,
+                  offset = range_start,
+                  span = range_span)
 
 def reencrypt(args):
     assert( args['reencrypt'] )
@@ -206,8 +206,8 @@ def reencrypt(args):
     recipient_pubkey = get_public_key(os.path.expanduser(args['--recipient_pk']))
     sender_pubkey = get_public_key(os.path.expanduser(args['--sender_pk'])) if args['--sender_pk'] else None
 
-    engine.reencrypt([(0, seckey, None)], # sender_keys
-                     [(0, seckey, recipient_pubkey)], # recipient_keys
-                     sys.stdin.buffer,
-                     sys.stdout.buffer,
-                     trim=args['--trim'])
+    lib.reencrypt([(0, seckey, None)], # sender_keys
+                  [(0, seckey, recipient_pubkey)], # recipient_keys
+                  sys.stdin.buffer,
+                  sys.stdout.buffer,
+                  trim=args['--trim'])

@@ -300,6 +300,24 @@ def decrypt(encrypted_packets, keys, sender_pubkey=None):
     return (decrypted_packets, ignored_packets)
 
 
+def deconstruct(infile, keys, sender_pubkey=None):
+    """Parse and decrypt a stream starting with a Crypt4GH header.
+
+    Raises ValueError if the header could not be decrypted
+    Returns (ciphers, edit_list generator or None)
+    """
+    header_packets = parse(infile)
+    packets, _ = decrypt(header_packets, keys, sender_pubkey=sender_pubkey)  # don't bother with ignored packets
+
+    if not packets: # no packets were decrypted
+        raise ValueError('No supported encryption method')
+
+    data_packets, edit_packet = partition_packets(packets)
+    # Parse returns the session key (since it should be method 0) 
+    ciphers = [ChaCha20Poly1305(parse_enc_packet(packet)) for packet in data_packets]
+    edit_list = parse_edit_list_packet(edit_packet) if edit_packet else None
+    return ciphers, edit_list
+
 # -------------------------------------
 # Header Re-Encryption
 # -------------------------------------
@@ -396,3 +414,5 @@ def rearrange(header_packets, keys, offset=0, span=None, sender_pubkey=None):
     packets = [encrypted_packet for packet in packets for encrypted_packet in encrypt(packet, keys)]
 
     return packets, segment_oracle()
+
+

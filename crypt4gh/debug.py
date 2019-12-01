@@ -13,7 +13,7 @@ from docopt import docopt
 
 from . import __title__, __version__, PROG
 from . import SEGMENT_SIZE
-from .engine import CIPHER_DIFF
+from .lib import CIPHER_DIFF
 from .keys import get_public_key, get_private_key
 from . import header
 

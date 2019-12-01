@@ -333,8 +333,9 @@ def body_decrypt_parts(infile, ciphers, output, edit_list=None):
     We do not decrypt segments that are entirely skipped, and only output a warning (that it should not be the case).
     We decrypt until the end of infile."""
 
-    # assert(edit_list is not None), "You can not call this function without an edit_list"
-    # LOG.debug('Edit List: %s', edit_list)
+    assert(edit_list is not None), "You can not call this function without an edit_list"
+    LOG.debug('Edit List: %s', edit_list)
+    assert(len(edit_list) > 0), "You can not call this function without an edit_list"
 
     decrypted = DecryptedBuffer(infile, ciphers, output)
 

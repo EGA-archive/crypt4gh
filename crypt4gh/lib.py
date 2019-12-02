@@ -1,10 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Handle the encryption of the application data.
-
-It encrypts or decrypts a given file read from stdin, and outputs the result to stdout.
-
-It also reencrypts Crypt4GH-formatted input, into another Crypt4GH-formatted output.
-"""
+"""Handle the encryption of the application data."""
 
 import os
 import logging

@@ -260,7 +260,7 @@ def encrypt(packet, keys):
 
     We only support method=0.
     
-    Returns None if no key worked.
+    :returns: None if no key worked, the decrypted packet otherwise
     '''
     ''''''
 
@@ -284,7 +284,7 @@ def encrypt(packet, keys):
 def decrypt(encrypted_packets, keys, sender_pubkey=None):
     '''Partition the packets into those that we can be decrypt and the others.
 
-    The output is 2 lists: one with decrypted packets and the other not understood encrypted packets'''
+    :returns: A list of decrypted packets and another list of undecryptable encrypted packets'''
 
     decrypted_packets = []
     ignored_packets = []
@@ -301,10 +301,14 @@ def decrypt(encrypted_packets, keys, sender_pubkey=None):
 
 
 def deconstruct(infile, keys, sender_pubkey=None):
-    """Parse and decrypt a stream starting with a Crypt4GH header.
+    """Retrieve the header from the `infile` stream, and decrypts it.
 
-    Raises ValueError if the header could not be decrypted
-    Returns (ciphers, edit_list generator or None)
+    Leaves the infile stream right after the header.
+
+    :return: a pair with a list of ciphers and a generator of lengths from an edit list (or None if there was no edit list).
+    :rtype: (list of ChaCha20Poly1305 ciphers, int generator or None)
+
+    :raises: ValueError if the header could not be decrypted
     """
     header_packets = parse(infile)
     packets, _ = decrypt(header_packets, keys, sender_pubkey=sender_pubkey)  # don't bother with ignored packets
@@ -323,7 +327,9 @@ def deconstruct(infile, keys, sender_pubkey=None):
 # -------------------------------------
 
 def reencrypt(header_packets, keys, recipient_keys, trim=False):
-    '''Re-encrypt the given header'''
+    '''Re-encrypt the given header.
+
+    :returns: new list of packets'''
     LOG.info('Reencrypting the header')
 
     decrypted_packets, ignored_packets = decrypt(header_packets, keys)
@@ -346,8 +352,9 @@ def reencrypt(header_packets, keys, recipient_keys, trim=False):
 def rearrange(header_packets, keys, offset=0, span=None, sender_pubkey=None):
     '''Re-arrange the edit list in accordance to the [start;end] range.
     
-    Returns the data_packet as-is and a new edit list packet.
-    It also returns an "oracle". The oracle tells if the "next" segment should be kept (starting by the first).
+    :returns: the data_packet as-is, a new edit list packet, along with an "oracle".
+    
+    The oracle tells if the "next" segment should be kept (starting by the first).
     '''
 
     LOG.info('Rearranging the header')

@@ -8,7 +8,7 @@ Python Modules
 
 .. autosummary::
 
-    crypt4gh.engine
+    crypt4gh.lib
     crypt4gh.header
     crypt4gh.keys
 
@@ -18,7 +18,7 @@ Python Modules
 Crypt4gh Engine
 ***************
 
-.. automodule:: crypt4gh.engine
+.. automodule:: crypt4gh.lib
    :members: encrypt, decrypt, reencrypt, rearrange
 
 ----
@@ -28,7 +28,7 @@ Crypt4gh Header
 ***************
 
 .. automodule:: crypt4gh.header
-   :members: encrypt, decrypt, reencrypt, rearrange
+   :members: encrypt, decrypt, reencrypt, rearrange, deconstruct
 
 ----
 

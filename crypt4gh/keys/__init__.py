@@ -46,9 +46,13 @@ Options:
 
 
 Environment variables:
-   C4GH_LOG         If defined, it will be used as the default logger
-   C4GH_PUBLIC_KEY  If defined, it will be used as the default public key (ie --pk ${{C4GH_PUBLIC_KEY}})
-   C4GH_SECRET_KEY  If defined, it will be used as the default secret key (ie --sk ${{C4GH_SECRET_KEY}})
+  +-------------------+--------------------------------------------------------------------------------------+
+  | C4GH_LOG          | If defined, it will be used as the default logger                                    |
+  +-------------------+--------------------------------------------------------------------------------------+
+  | C4GH_PUBLIC_KEY   | If defined, it will be used as the default public key (ie --pk ${{C4GH_PUBLIC_KEY}})   |
+  +-------------------+--------------------------------------------------------------------------------------+
+  | C4GH_SECRET_KEY   | If defined, it will be used as the default secret key (ie --sk ${{C4GH_SECRET_KEY}})   |
+  +-------------------+--------------------------------------------------------------------------------------+
  
 '''
 

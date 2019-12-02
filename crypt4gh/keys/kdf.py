@@ -1,9 +1,6 @@
 #######################################################################
 ## Key Derivation
 #######################################################################
-
-from hashlib import pbkdf2_hmac
-import bcrypt
 try:
     from hashlib import scrypt
     scrypt_supported = True
@@ -31,11 +28,15 @@ def get_kdf(kdfname):
 
 def derive_key(alg, passphrase, salt, rounds, dklen=32):
     if alg == b'scrypt':
+        if not scrypt_supported:
+            raise ValueError("scrypt is not supported on this plateform")
         return scrypt(passphrase, salt=salt, n=1<<14, r=8, p=1, dklen=dklen)
     if alg == b'bcrypt':
+        import bcrypt
         return bcrypt.kdf(passphrase, salt=salt, desired_key_bytes=dklen, rounds=rounds,
                           # We can't control how many rounds are on disk, so no sense warning about it.
                           ignore_few_rounds=True)
     if alg == b'pbkdf2_hmac_sha256':
+        from hashlib import pbkdf2_hmac
         return pbkdf2_hmac('sha256', passphrase, salt, rounds, dklen=dklen)
     raise NotImplementedError(f'Unsupported KDF: {alg}')

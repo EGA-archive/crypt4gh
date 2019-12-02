@@ -39,7 +39,6 @@ def encode_private_key(key, passphrase, comment):
 	        (encode_string(comment) if comment is not None else b'')) # optional comment
 
     # We have a passphrase: we encrypt the private key
-    global KDFs, scrypt_supported
     # Ideally, scrypt is chosen over bcrypt or pbkdf2_hmac_sha256
     # But in case there is no support for it, we pick bcrypt
     kdfname = b'scrypt' if scrypt_supported else b'bcrypt'

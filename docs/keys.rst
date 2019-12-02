@@ -34,7 +34,7 @@ For a private key, we use the following encoding format.
 The ``MAGIC_WORD`` is the byte-representation of the ASCII word "c4gh-v1".
 
 Everything ``string`` consists of a length n (encoded as 2 big-endian bytes) and a sequence of n bytes.
-For example, the ``string`` hello, is encoded as ``\x00\x05hello``.
+For example, the string *hello*, is encoded as ``\x00\x05hello``.
 
 The ``kdfname`` is the name of the Key Derivation Function. We support either ``scrypt``, ``pbkdf2_hmac_sha256``, ``bcrypt``, or ``none``. The python implementation uses scrypt when available, and defaults to bcrypt for generating keys.
 

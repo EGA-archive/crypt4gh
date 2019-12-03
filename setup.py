@@ -38,5 +38,6 @@ setup(name='crypt4gh',
           'cryptography>=2.8',
           'pynacl>=1.3.0',
           'bcrypt', # include version when needed
+          'boto3',
       ],
 )

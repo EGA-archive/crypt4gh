@@ -3,3 +3,4 @@ docopt
 cryptography
 pynacl
 bcrypt
+boto3

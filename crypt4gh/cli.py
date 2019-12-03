@@ -25,16 +25,17 @@ __doc__ = f'''
 Utility for the cryptographic GA4GH standard, reading from stdin and outputting to stdout.
 
 Usage:
-   {PROG} [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path> [--range <start-end>]
-   {PROG} [-hv] [--log <file>] decrypt [--sk <path>] [--sender_pk <path>] [--range <start-end>]
-   {PROG} [-hv] [--log <file>] rearrange [--sk <path>] --range <start-end>
-   {PROG} [-hv] [--log <file>] reencrypt [--sk <path>] --recipient_pk <path> [--sender_public_key <path>] [--trim]
+   {PROG} [-hv] [--log <file>] encrypt [--sk <path>|--ssm_secret_id <id>] --recipient_pk <path> [--range <start-end>]
+   {PROG} [-hv] [--log <file>] decrypt [--sk <path>|--ssm_secret_id <id>] [--sender_pk <path>] [--range <start-end>]
+   {PROG} [-hv] [--log <file>] rearrange [--sk <path>|--ssm_secret_id <id>] --range <start-end>
+   {PROG} [-hv] [--log <file>] reencrypt [--sk <path>|--ssm_secret_id <id>] --recipient_pk <path> [--sender_public_key <path>] [--trim]
 
 Options:
    -h, --help             Prints this help and exit
    -v, --version          Prints the version and exits
    --log <file>           Path to the logger file (in YML format)
    --sk <keyfile>         Curve25519-based Private key [default: {DEFAULT_SK}]
+   --ssm_secret_id <id>   Curve25519-based Private key from AWS
    --recipient_pk <path>  Recipient's Curve25519-based Public key
    --sender_pk <path>     Peer's Curve25519-based Public key to verify provenance (aka, signature)
    --range <start-end>    Byte-range either as  <start-end> or just <start> (Start included, End excluded)
@@ -97,6 +98,12 @@ def parse_range(args):
 
 def retrieve_private_key(args):
 
+    # If there is an AWS secret id
+    if args['--ssm_secret_id']:
+        from crypt4gh.keys import aws
+        return aws.get_private_key(args['--ssm_secret_id'])
+
+    # Otherwise: regular key on file
     seckey = args['--sk'] or DEFAULT_SK
     seckeypath = os.path.expanduser(seckey)
     if not os.path.exists(seckeypath):

@@ -60,7 +60,10 @@ def parse_args(argv=sys.argv[1:]):
 
     # Logging
     logger = args['--log'] or DEFAULT_LOG
-    logging.basicConfig(stream=sys.stderr, level=logging.CRITICAL) # for the root logger
+    # for the root logger
+    logging.basicConfig(stream=sys.stderr,
+                        level=logging.CRITICAL,
+                        format='[%(levelname)s] %(message)s')
     if logger and os.path.exists(logger):
         with open(logger, 'rt') as stream:
             import yaml
@@ -92,16 +95,7 @@ def parse_range(args):
         raise ValueError(f"Invalid range: {args['--range']}")
     return (start, span)
 
-def encrypt(args):
-    assert( args['encrypt'] )
-
-    range_start, range_span = parse_range(args)
-
-    recipient_pubkey = os.path.expanduser(args['--recipient_pk'])
-    if not os.path.exists(recipient_pubkey):
-        raise ValueError("Recipient's Public Key not found")
-    recipient_pubkey = get_public_key(recipient_pubkey)
-
+def retrieve_private_key(args):
 
     seckey = args['--sk'] or DEFAULT_SK
     seckeypath = os.path.expanduser(seckey)
@@ -116,7 +110,21 @@ def encrypt(args):
     else:
         cb = partial(getpass, prompt=f'Passphrase for {seckey}: ')
 
-    seckey = get_private_key(seckeypath, cb)
+    return get_private_key(seckeypath, cb)
+
+def encrypt(args):
+    assert( args['encrypt'] )
+
+    range_start, range_span = parse_range(args)
+
+    recipient_pubkey = os.path.expanduser(args['--recipient_pk'])
+    if not os.path.exists(recipient_pubkey):
+        raise ValueError("Recipient's Public Key not found")
+    recipient_pubkey = get_public_key(recipient_pubkey)
+
+
+    seckey = retrieve_private_key(args)
+
     keys = [(0, seckey, recipient_pubkey)] # keys = list of (method, privkey, recipient_pubkey=None)
 
     lib.encrypt(keys,
@@ -133,20 +141,8 @@ def decrypt(args):
 
     range_start, range_span = parse_range(args)
 
-    seckey = args['--sk'] or DEFAULT_SK
-    seckeypath = os.path.expanduser(seckey)
-    if not os.path.exists(seckeypath):
-        raise ValueError('Secret key not found')
+    seckey = retrieve_private_key(args)
 
-    passphrase = os.getenv('C4GH_PASSPHRASE')
-    if passphrase:
-        #LOG.warning("Using a passphrase in an environment variable is insecure")
-        print("Warning: Using a passphrase in an environment variable is insecure", file=sys.stderr)
-        cb = lambda : passphrase
-    else:
-        cb = partial(getpass, prompt=f'Passphrase for {seckey}: ')
-
-    seckey = get_private_key(seckeypath, cb)
     keys = [(0, seckey, None)] # keys = list of (method, privkey, recipient_pubkey=None)
 
     lib.decrypt(keys,
@@ -162,20 +158,7 @@ def rearrange(args):
 
     range_start, range_span = parse_range(args)
 
-    seckey = args['--sk'] or DEFAULT_SK
-    seckeypath = os.path.expanduser(seckey)
-    if not os.path.exists(seckeypath):
-        raise ValueError('Secret key not found')
-
-    passphrase = os.getenv('C4GH_PASSPHRASE')
-    if passphrase:
-        #LOG.warning("Using a passphrase in an environment variable is insecure")
-        print("Warning: Using a passphrase in an environment variable is insecure", file=sys.stderr)
-        cb = lambda : passphrase
-    else:
-        cb = partial(getpass, prompt=f'Passphrase for {seckey}: ')
-
-    seckey = get_private_key(seckeypath, cb)
+    seckey = retrieve_private_key(args)
 
     keys = [(0, seckey, bytes(PrivateKey(seckey).public_key))] # keys = list of (method, privkey, recipient_pubkey=ourselves)
 
@@ -188,22 +171,10 @@ def rearrange(args):
 def reencrypt(args):
     assert( args['reencrypt'] )
 
-    seckey = args['--sk'] or DEFAULT_SK
-    seckeypath = os.path.expanduser(seckey)
-    if not os.path.exists(seckeypath):
-        raise ValueError('Secret key not found')
-
-    passphrase = os.getenv('C4GH_PASSPHRASE')
-    if passphrase:
-        #LOG.warning("Using a passphrase in an environment variable is insecure")
-        print("Warning: Using a passphrase in an environment variable is insecure", file=sys.stderr)
-        cb = lambda : passphrase
-    else:
-        cb = partial(getpass, prompt=f'Passphrase for {seckey}: ')
-
-    seckey = get_private_key(seckeypath, cb)
+    seckey = retrieve_private_key(args)
 
     recipient_pubkey = get_public_key(os.path.expanduser(args['--recipient_pk']))
+
     sender_pubkey = get_public_key(os.path.expanduser(args['--sender_pk'])) if args['--sender_pk'] else None
 
     lib.reencrypt([(0, seckey, None)], # sender_keys

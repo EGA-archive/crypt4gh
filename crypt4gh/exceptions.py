@@ -8,8 +8,9 @@ import sys
 import logging
 import errno
 
-from nacl.exceptions import InvalidkeyError, BadSignatureError, CryptoError
-from cryptography.exceptions import InvalidTag
+from nacl.exceptions import (InvalidkeyError,
+                             BadSignatureError,
+                             CryptoError)
 
 LOG = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ def exit_on_invalid_passphrase(func):
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except (InvalidTag) as e:
+        except CryptoError as e:
             LOG.error('Exiting for %r', e)
             print('Invalid Key or Passphrase', file=sys.stderr)
             sys.exit(2)

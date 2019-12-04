@@ -6,11 +6,13 @@ import logging
 import io
 import collections
 
-from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
-from cryptography.exceptions import InvalidTag
+from nacl.bindings import (crypto_aead_chacha20poly1305_ietf_encrypt,
+                           crypto_aead_chacha20poly1305_ietf_decrypt)
+from nacl.exceptions import CryptoError
+
 
 from . import SEGMENT_SIZE
-from .exceptions import convert_error, close_on_broken_pipe
+from .exceptions import close_on_broken_pipe
 from . import header
 
 LOG = logging.getLogger(__name__)
@@ -32,13 +34,13 @@ CIPHER_SEGMENT_SIZE = SEGMENT_SIZE + CIPHER_DIFF
 ##
 ##############################################################
 
-def _encrypt_segment(data, process, cipher):
+def _encrypt_segment(data, process, key):
     '''Utility function to generate a nonce, encrypt data with Chacha20, and authenticate it with Poly1305.'''
 
     #LOG.debug("Segment [%d bytes]: %s..%s", len(data), data[:10], data[-10:])
 
     nonce = os.urandom(12)
-    encrypted_data = cipher.encrypt(nonce, data, None)  # No add
+    encrypted_data = crypto_aead_chacha20poly1305_ietf_encrypt(data, None, nonce, key)  # no add
     process(nonce) # after producing the segment, so we don't start outputing when an error occurs
     process(encrypted_data)
 
@@ -81,7 +83,6 @@ def encrypt(keys, infile, outfile, offset=0, span=None):
     # Preparing the encryption engine
     encryption_method = 0 # only choice for this version
     session_key = os.urandom(32) # we use one session key for all blocks
-    cipher = ChaCha20Poly1305(session_key) # create a new one in case an old one is not reset
 
     # Output the header
     LOG.debug('Creating Crypt4GH header')
@@ -108,11 +109,11 @@ def encrypt(keys, infile, outfile, offset=0, span=None):
 
             if segment_len < SEGMENT_SIZE: # not a full segment
                 data = bytes(segment[:segment_len]) # to discard the bytes from the previous segments
-                _encrypt_segment(data, outfile.write, cipher)
+                _encrypt_segment(data, outfile.write, session_key)
                 break
 
             data = bytes(segment) # this is a full segment
-            _encrypt_segment(data, outfile.write, cipher)
+            _encrypt_segment(data, outfile.write, session_key)
 
     else: # we have a max size
         assert( span )
@@ -128,10 +129,10 @@ def encrypt(keys, infile, outfile, offset=0, span=None):
 
             if span < segment_len: # stop early
                 data = data[:span]
-                _encrypt_segment(data, outfile.write, cipher)
+                _encrypt_segment(data, outfile.write, session_key)
                 break
 
-            _encrypt_segment(data, outfile.write, cipher)
+            _encrypt_segment(data, outfile.write, session_key)
 
             span -= segment_len
 
@@ -156,17 +157,17 @@ def cipher_chunker(f, size):
         assert( ciphersegment_len > CIPHER_DIFF )
         yield ciphersegment
 
-def decrypt_block(ciphersegment, ciphers):
+def decrypt_block(ciphersegment, session_keys):
     # Trying the different session keys (via the cipher objects)
     # Note: we could order them and if one fails, we move it at the end of the list
     # So... LRU solution. For now, try them as they come.
     nonce = ciphersegment[:12]
     data = ciphersegment[12:]
 
-    for cipher in ciphers:
+    for key in session_keys:
         try:
-            return cipher.decrypt(nonce, data, None)  # No aad, and break the loop
-        except InvalidTag as tag:
+            return crypto_aead_chacha20poly1305_ietf_decrypt(data, None, nonce, key)  # no add, and break the loop
+        except CryptoError as tag:
             LOG.error('Decryption failed: %s', tag)
     else: # no cipher worked: Bark!
         raise ValueError('Could not decrypt that block')
@@ -214,7 +215,7 @@ def limited_output(offset=0, limit=None, process=None):
         offset = 0 # reset offset
 
 
-def body_decrypt(infile, ciphers, output, offset):
+def body_decrypt(infile, session_keys, output, offset):
     """Decrypt the whole data portion.
 
     We fast-forward if offset >= SEGMENT_SIZE.
@@ -231,16 +232,16 @@ def body_decrypt(infile, ciphers, output, offset):
 
     try:
         for ciphersegment in cipher_chunker(infile, CIPHER_SEGMENT_SIZE):
-            segment = decrypt_block(ciphersegment, ciphers)
+            segment = decrypt_block(ciphersegment, session_keys)
             output.send(segment)
     except ProcessingOver:  # output raised it
         pass
 
 
 class DecryptedBuffer():
-    def __init__(self, fileobj, ciphers, output):
+    def __init__(self, fileobj, session_keys, output):
         self.fileobj = fileobj
-        self.ciphers = ciphers
+        self.session_keys = session_keys
         self.buf = io.BytesIO()
         self.block = 0  # just used for printing, if that block is entirely skipped
         self.output = output
@@ -278,7 +279,7 @@ class DecryptedBuffer():
         # else, we decrypt
         LOG.debug('Decrypting block %d', self.block)
         assert( len(data) > CIPHER_DIFF )
-        segment = decrypt_block(data, self.ciphers)
+        segment = decrypt_block(data, self.session_keys)
         LOG.debug('Adding %d bytes to the buffer', len(segment))
         self._append_to_buf(segment)
         LOG.debug('Buffer size: %d', self.buf_size())
@@ -322,7 +323,7 @@ class DecryptedBuffer():
             size -= len(b2)
 
 
-def body_decrypt_parts(infile, ciphers, output, edit_list=None):
+def body_decrypt_parts(infile, session_keys, output, edit_list=None):
     """Decrypt the data portion according to the edit list.
 
     We do not decrypt segments that are entirely skipped, and only output a warning (that it should not be the case).
@@ -332,7 +333,7 @@ def body_decrypt_parts(infile, ciphers, output, edit_list=None):
     LOG.debug('Edit List: %s', edit_list)
     assert(len(edit_list) > 0), "You can not call this function without an edit_list"
 
-    decrypted = DecryptedBuffer(infile, ciphers, output)
+    decrypted = DecryptedBuffer(infile, session_keys, output)
 
     try:
 
@@ -374,7 +375,7 @@ def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
         )
     )
 
-    ciphers, edit_list = header.deconstruct(infile, keys, sender_pubkey=sender_pubkey)
+    session_keys, edit_list = header.deconstruct(infile, keys, sender_pubkey=sender_pubkey)
 
     # Infile in now positioned at the beginning of the data portion
 
@@ -384,11 +385,11 @@ def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
 
     if edit_list is None:
         # No edit list: decrypt all segments until the end
-        body_decrypt(infile, ciphers, output, offset)
+        body_decrypt(infile, session_keys, output, offset)
         # We could use body_decrypt_parts but there is an inner buffer, and segments might not be aligned
     else:
         # Edit list: it drives which segments is decrypted
-        body_decrypt_parts(infile, ciphers, output, edit_list=list(edit_list))
+        body_decrypt_parts(infile, session_keys, output, edit_list=list(edit_list))
 
     LOG.info('Decryption Over')
 

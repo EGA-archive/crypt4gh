@@ -12,10 +12,8 @@ import io
 from functools import partial
 from getpass import getpass
 
-from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
-
 from crypt4gh.keys import get_private_key, get_public_key
-from crypt4gh import header,lib, SEGMENT_SIZE
+from crypt4gh import header, lib, SEGMENT_SIZE
 
 if __name__ == '__main__':
 
@@ -73,7 +71,6 @@ if __name__ == '__main__':
     #############################################################
     encryption_method = 0 # only choice for this version
     session_key = os.urandom(32) # we use one session key for all blocks
-    cipher = ChaCha20Poly1305(session_key) # create a new one in case an old one is not reset
 
     #############################################################
     # Output the header
@@ -99,10 +96,10 @@ if __name__ == '__main__':
 
         if segment_len < SEGMENT_SIZE: # not a full segment
             data = bytes(segment[:segment_len]) # to discard the bytes from the previous segments
-            lib._encrypt_segment(data, outfile.write, cipher)
+            lib._encrypt_segment(data, outfile.write, session_key)
             break
 
         data = bytes(segment) # this is a full segment
-        lib._encrypt_segment(data, outfile.write, cipher)
+        lib._encrypt_segment(data, outfile.write, session_key)
 
 

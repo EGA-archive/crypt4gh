@@ -4,12 +4,14 @@
 import os
 import logging
 from itertools import chain
-from types import GeneratorType
+# from types import GeneratorType
 
-from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
-from nacl.bindings import crypto_kx_client_session_keys, crypto_kx_server_session_keys
+from nacl.bindings import (crypto_kx_client_session_keys,
+                           crypto_kx_server_session_keys,
+                           crypto_aead_chacha20poly1305_ietf_encrypt,
+                           crypto_aead_chacha20poly1305_ietf_decrypt)
+from nacl.exceptions import CryptoError
 from nacl.public import PrivateKey
-from cryptography.exceptions import InvalidTag
 
 from . import SEGMENT_SIZE, VERSION
 
@@ -182,11 +184,9 @@ def encrypt_X25519_Chacha20_Poly1305(data, seckey, recipient_pubkey):
     LOG.debug('shared key: %s', shared_key.hex())
 
     # Chacha20_Poly1305
-    engine = ChaCha20Poly1305(shared_key)
     nonce = os.urandom(12)
-    return (pubkey +
-            nonce +
-            engine.encrypt(nonce, data, None))  # No add
+    encrypted_data = crypto_aead_chacha20poly1305_ietf_encrypt(data, None, nonce, shared_key)  # no add
+    return (pubkey + nonce + encrypted_data)
 
 def decrypt_X25519_Chacha20_Poly1305(encrypted_part, privkey, sender_pubkey=None):
     #LOG.debug('-----------  Encrypted data: %s', encrypted_part.hex())
@@ -210,8 +210,7 @@ def decrypt_X25519_Chacha20_Poly1305(encrypted_part, privkey, sender_pubkey=None
     LOG.debug('shared key: %s', shared_key.hex())
 
     # Chacha20_Poly1305
-    engine = ChaCha20Poly1305(shared_key)
-    return engine.decrypt(nonce, packet_data, None)  # No add
+    return crypto_aead_chacha20poly1305_ietf_decrypt(packet_data, None, nonce, shared_key)  # no add
 
 
 def decrypt_packet(packet, keys, sender_pubkey=None):
@@ -233,7 +232,7 @@ def decrypt_packet(packet, keys, sender_pubkey=None):
             try:
                 privkey, _ = key # must fit
                 return decrypt_X25519_Chacha20_Poly1305(packet[4:], privkey, sender_pubkey=sender_pubkey)
-            except InvalidTag as tag:
+            except CryptoError as tag:
                 LOG.error('Packet Decryption failed: %s', tag)
             except Exception as e: # Any other error, like (IndexError, TypeError, ValueError)
                 LOG.error('Not a X25519 key: ignoring | %s', e)
@@ -305,8 +304,8 @@ def deconstruct(infile, keys, sender_pubkey=None):
 
     Leaves the infile stream right after the header.
 
-    :return: a pair with a list of ciphers and a generator of lengths from an edit list (or None if there was no edit list).
-    :rtype: (list of ChaCha20Poly1305 ciphers, int generator or None)
+    :return: a pair with a list of session keys and a generator of lengths from an edit list (or None if there was no edit list).
+    :rtype: (list of bytes, int generator or None)
 
     :raises: ValueError if the header could not be decrypted
     """
@@ -318,9 +317,9 @@ def deconstruct(infile, keys, sender_pubkey=None):
 
     data_packets, edit_packet = partition_packets(packets)
     # Parse returns the session key (since it should be method 0) 
-    ciphers = [ChaCha20Poly1305(parse_enc_packet(packet)) for packet in data_packets]
+    session_keys = [parse_enc_packet(packet) for packet in data_packets]
     edit_list = parse_edit_list_packet(edit_packet) if edit_packet else None
-    return ciphers, edit_list
+    return session_keys, edit_list
 
 # -------------------------------------
 # Header Re-Encryption

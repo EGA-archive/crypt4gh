@@ -4,7 +4,7 @@ import io
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import algorithms, Cipher, modes
-from cryptography.exceptions import InvalidTag
+from nacl.exceptions import CryptoError
 from nacl.bindings.crypto_sign import crypto_sign_ed25519_pk_to_curve25519, crypto_sign_ed25519_sk_to_curve25519
 
 from .kdf import derive_key
@@ -170,7 +170,7 @@ def parse_private_key(stream, callback):
 
     if private_data[:4] != private_data[4:8]: # check don't pass
         LOG.debug('Check: %s != %s', private_data[:4], private_data[4:8])
-        raise InvalidTag() 
+        raise CryptoError()
     private_data = io.BytesIO(private_data[8:])
     # Note: we ignore the comment and padding after the priv blob
     return _get_skpk_from_private_blob(private_data) # no need to unpad

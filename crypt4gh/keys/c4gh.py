@@ -30,7 +30,7 @@ def decode_string(stream):
 
 
 def encode_private_key(key, passphrase, comment):
-    if passphrase is None:
+    if not passphrase:  # None and empty
         print(f'WARNING: The private key is not encrypted', file=sys.stderr)
         return (MAGIC_WORD + 
 	        encode_string(None) + # kdf = none (no kdfoptions)

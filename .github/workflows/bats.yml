@@ -1,4 +1,4 @@
-name: crypt4gh tests with bats
+name: Testsuite
 
 on: [push]
 

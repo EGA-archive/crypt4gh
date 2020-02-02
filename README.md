@@ -1,3 +1,6 @@
+[![Documentation Status](https://readthedocs.org/projects/crypt4gh/badge/?version=latest)](https://crypt4gh.readthedocs.io/en/latest/?badge=latest)
+[![Testsuite](https://github.com/EGA-archive/crypt4gh/workflows/Testsuite/badge.svg)](https://github.com/EGA-archive/crypt4gh/actions)
+
 # Crypt4GH Encryption Utility
 
 `crypt4gh`is a Python tool to encrypt, decrypt or re-encrypt files, according to the [GA4GH encryption file format](https://www.ga4gh.org/news/crypt4gh-a-secure-method-for-sharing-human-genetic-data/).
@@ -6,6 +9,14 @@
 ## Installation
 
 Python `3.6+` required to use the crypt4gh encryption utility.
+
+Install it from PyPI:
+
+```
+pip install crypt4gh
+```
+
+or if you prefer the latest sources from Github:
 
 ```
 git clone https://github.com/EGA-archive/crypt4gh

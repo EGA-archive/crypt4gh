@@ -1,35 +1,54 @@
 import sys
 assert sys.version_info >= (3, 6), "crypt4gh requires python 3.6 or higher"
 
-from setuptools import setup
+from pathlib import Path
+from setuptools import setup, find_packages
 
-from crypt4gh import (__title__,
-                      __version__,
-                      __author__,
-                      __author_email__,
-                      __license__,
-                      __doc__ as crypt4gh_doc,
-                      PROG)
+_readme = (Path(__file__).parent / "README.md").read_text()
 
 setup(name='crypt4gh',
-      version=__version__,
+      version='1.1',
       url='https://www.github.com/EGA-archive/crypt4gh',
-      license=__license__,
-      author=__author__,
-      author_email=__author_email__,
-      description=__title__,
-      long_description=crypt4gh_doc,
-      packages=['crypt4gh', 'crypt4gh.keys'],
-      include_package_data=False,
+      license='Apache License 2.0',
+      author='Frédéric Haziza',
+      author_email='frederic.haziza@crg.eu',
+      description='GA4GH cryptographic utilities',
+      long_description=_readme,
+      long_description_content_type="text/markdown",
+      packages=find_packages(),
+      include_package_data=True,
       package_data={ 'crypt4gh': ['completions'] },
       zip_safe=False,
       entry_points={
           'console_scripts': [
-              f'{PROG}=crypt4gh.__main__:main',
-              f'{PROG}-keygen=crypt4gh.keys.__init__:main',
+              f'crypt4gh=crypt4gh.__main__:main',
+              f'crypt4gh-keygen=crypt4gh.keys.__init__:main',
           ]
       },
-      platforms = 'any',
+      platforms='any',
+      classifiers=[  # Optional
+          'Development Status :: 5 - Production/Stable',
+          'License :: OSI Approved :: Apache Software License',
+
+          'Natural Language :: English',
+          'Operating System :: MacOS :: MacOS X',
+          'Operating System :: POSIX',
+          'Operating System :: POSIX :: BSD',
+          'Operating System :: POSIX :: Linux',
+          # 'Operating System :: Microsoft :: Windows,
+
+          'Intended Audience :: Developers',
+          'Intended Audience :: Healthcare Industry',
+          'Intended Audience :: Information Technology',
+          'Topic :: Security :: Cryptography',
+          'Topic :: Scientific/Engineering :: Bio-Informatics',
+
+          'Programming Language :: Python :: 3.6',
+          'Programming Language :: Python :: 3.7',
+          'Programming Language :: Python :: 3.8',
+
+          'Programming Language :: Python :: Implementation :: CPython',
+      ],
       python_requires='>=3.6',
       # See https://packaging.python.org/discussions/install-requires-vs-requirements/
       install_requires=[

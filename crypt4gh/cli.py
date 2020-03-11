@@ -25,10 +25,10 @@ __doc__ = f'''
 Utility for the cryptographic GA4GH standard, reading from stdin and outputting to stdout.
 
 Usage:
-   {PROG} [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path> [--range <start-end>]
+   {PROG} [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--range <start-end>]
    {PROG} [-hv] [--log <file>] decrypt [--sk <path>] [--sender_pk <path>] [--range <start-end>]
    {PROG} [-hv] [--log <file>] rearrange [--sk <path>] --range <start-end>
-   {PROG} [-hv] [--log <file>] reencrypt [--sk <path>] --recipient_pk <path> [--sender_public_key <path>] [--trim]
+   {PROG} [-hv] [--log <file>] reencrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--trim]
 
 Options:
    -h, --help             Prints this help and exit
@@ -36,7 +36,7 @@ Options:
    --log <file>           Path to the logger file (in YML format)
    --sk <keyfile>         Curve25519-based Private key [default: {DEFAULT_SK}]
    --recipient_pk <path>  Recipient's Curve25519-based Public key
-   --sender_pk <path>     Peer's Curve25519-based Public key to verify provenance (aka, signature)
+   --sender_pk <path>     Peer's Curve25519-based Public key to verify provenance (akin to signature)
    --range <start-end>    Byte-range either as  <start-end> or just <start> (Start included, End excluded)
    -t, --trim             Keep only header packets that you can decrypt
 
@@ -117,17 +117,22 @@ def encrypt(args):
 
     range_start, range_span = parse_range(args)
 
-    recipient_pubkey = os.path.expanduser(args['--recipient_pk'])
-    if not os.path.exists(recipient_pubkey):
-        raise ValueError("Recipient's Public Key not found")
-    recipient_pubkey = get_public_key(recipient_pubkey)
-
-
     seckey = retrieve_private_key(args)
 
-    keys = [(0, seckey, recipient_pubkey)] # keys = list of (method, privkey, recipient_pubkey=None)
+    def build_recipients():
+        for pk in args['--recipient_pk']:
+            recipient_pubkey = os.path.expanduser(pk)
+            if not os.path.exists(recipient_pubkey):
+                continue
+            LOG.debug("Recipient pubkey: %s", recipient_pubkey)
+            yield (0, seckey, get_public_key(recipient_pubkey))
 
-    lib.encrypt(keys,
+    # keys = list of (method, privkey, recipient_pubkey=None)
+    recipient_keys = list(build_recipients())
+    if not recipient_keys:
+        raise ValueError("No Recipients' Public Key found")
+
+    lib.encrypt(recipient_keys,
                 sys.stdin.buffer,
                 sys.stdout.buffer,
                 offset = range_start,
@@ -173,12 +178,21 @@ def reencrypt(args):
 
     seckey = retrieve_private_key(args)
 
-    recipient_pubkey = get_public_key(os.path.expanduser(args['--recipient_pk']))
+    def build_recipients():
+        for pk in args['--recipient_pk']:
+            recipient_pubkey = os.path.expanduser(pk)
+            if not os.path.exists(recipient_pubkey):
+                continue
+            LOG.debug("Recipient pubkey: %s", recipient_pubkey)
+            yield (0, seckey, get_public_key(recipient_pubkey))
 
-    sender_pubkey = get_public_key(os.path.expanduser(args['--sender_pk'])) if args['--sender_pk'] else None
+    # keys = list of (method, privkey, recipient_pubkey=None)
+    recipient_keys = list(build_recipients())
+    if not recipient_keys:
+        raise ValueError("No Recipients' Public Key found")
 
     lib.reencrypt([(0, seckey, None)], # sender_keys
-                  [(0, seckey, recipient_pubkey)], # recipient_keys
+                  recipient_keys,
                   sys.stdin.buffer,
                   sys.stdout.buffer,
                   trim=args['--trim'])

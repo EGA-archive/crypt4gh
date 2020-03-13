@@ -17,7 +17,7 @@ from .keys import get_public_key, get_private_key
 
 LOG = logging.getLogger(__name__)
 
-DEFAULT_SK  = os.getenv('C4GH_SECRET_KEY', '~/.c4gh/key')
+DEFAULT_SK  = os.getenv('C4GH_SECRET_KEY', None)
 DEFAULT_LOG = os.getenv('C4GH_LOG', None)
 
 __doc__ = f'''
@@ -34,7 +34,7 @@ Options:
    -h, --help             Prints this help and exit
    -v, --version          Prints the version and exits
    --log <file>           Path to the logger file (in YML format)
-   --sk <keyfile>         Curve25519-based Private key [default: {DEFAULT_SK}]
+   --sk <keyfile>         Curve25519-based Private key
    --recipient_pk <path>  Recipient's Curve25519-based Public key
    --sender_pk <path>     Peer's Curve25519-based Public key to verify provenance (akin to signature)
    --range <start-end>    Byte-range either as  <start-end> or just <start> (Start included, End excluded)
@@ -62,7 +62,8 @@ def parse_args(argv=sys.argv[1:]):
     logger = args['--log'] or DEFAULT_LOG
     # for the root logger
     logging.basicConfig(stream=sys.stderr,
-                        level=logging.CRITICAL,
+                        #level=logging.CRITICAL,
+                        level=logging.DEBUG,
                         format='[%(levelname)s] %(message)s')
     if logger and os.path.exists(logger):
         with open(logger, 'rt') as stream:
@@ -95,9 +96,16 @@ def parse_range(args):
         raise ValueError(f"Invalid range: {args['--range']}")
     return (start, span)
 
-def retrieve_private_key(args):
+def retrieve_private_key(args, generate=False):
 
     seckey = args['--sk'] or DEFAULT_SK
+
+    if generate and seckey is None: # generate a one on the fly
+        sk = PrivateKey.generate()
+        skey = bytes(sk)
+        LOG.debug('Generating Private Key: %s', skey.hex().upper())
+        return skey
+
     seckeypath = os.path.expanduser(seckey)
     if not os.path.exists(seckeypath):
         raise ValueError('Secret key not found')
@@ -117,7 +125,7 @@ def encrypt(args):
 
     range_start, range_span = parse_range(args)
 
-    seckey = retrieve_private_key(args)
+    seckey = retrieve_private_key(args, generate=True)
 
     def build_recipients():
         for pk in args['--recipient_pk']:

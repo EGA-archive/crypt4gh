@@ -31,7 +31,7 @@ _crypt4gh_encrypt()
     cur="${COMP_WORDS[COMP_CWORD]}"
 
     if [ $COMP_CWORD -ge 2 ]; then
-        COMPREPLY=( $( compgen -W '--sk= --recipient_pk= --range= ' -- $cur) )
+        COMPREPLY=( $( compgen -W '--sk= --recipient_pk= --recipient_pk= --range= ' -- $cur) )
     fi
 }
 
@@ -61,7 +61,7 @@ _crypt4gh_reencrypt()
     cur="${COMP_WORDS[COMP_CWORD]}"
 
     if [ $COMP_CWORD -ge 2 ]; then
-        COMPREPLY=( $( compgen -fW '--sk= --recipient_pk= --sender_public_key -t --trim ' -- $cur) )
+        COMPREPLY=( $( compgen -W '--sk= --recipient_pk= --recipient_pk= -t --trim ' -- $cur) )
     fi
 }
 

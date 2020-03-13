@@ -22,6 +22,7 @@ The usual ``-h`` flag shows you the different options that the tool accepts.
 	-v, --version          Prints the version and exits
 	--log <file>           Path to the logger file (in YML format)
 	--sk <keyfile>         Curve25519-based Private key
+	                       When encrypting, if neither the private key nor C4GH_SECRET_KEY are specified, we generate a new key 
 	--recipient_pk <path>  Recipient's Curve25519-based Public key
 	--sender_pk <path>     Peer's Curve25519-based Public key to verify provenance (aka, signature)
 	--range <start-end>    Byte-range either as  <start-end> or just <start> (Start included, End excluded)

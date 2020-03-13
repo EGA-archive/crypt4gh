@@ -40,18 +40,18 @@ $ crypt4gh -h
 Utility for the cryptographic GA4GH standard, reading from stdin and outputting to stdout.
 
 Usage:
-   crypt4gh [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path> [--range <start-end>]
-   crypt4gh [-hv] [--log <file>] decrypt [--sk <path>] [--sender_pk <path>] [--range <start-end>]
-   crypt4gh [-hv] [--log <file>] rearrange [--sk <path>] --range <start-end>
-   crypt4gh [-hv] [--log <file>] reencrypt [--sk <path>] --recipient_pk <path> [--sender_public_key <path>] [--trim]
+   {PROG} [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--range <start-end>]
+   {PROG} [-hv] [--log <file>] decrypt [--sk <path>] [--sender_pk <path>] [--range <start-end>]
+   {PROG} [-hv] [--log <file>] rearrange [--sk <path>] --range <start-end>
+   {PROG} [-hv] [--log <file>] reencrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--trim]
 
 Options:
    -h, --help             Prints this help and exit
    -v, --version          Prints the version and exits
    --log <file>           Path to the logger file (in YML format)
-   --sk <keyfile>         Curve25519-based Private key [default: ~/.c4gh/key]
+   --sk <keyfile>         Curve25519-based Private key [default: {DEFAULT_SK}]
    --recipient_pk <path>  Recipient's Curve25519-based Public key
-   --sender_pk <path>     Peer's Curve25519-based Public key to verify provenance (aka, signature)
+   --sender_pk <path>     Peer's Curve25519-based Public key to verify provenance (akin to signature)
    --range <start-end>    Byte-range either as  <start-end> or just <start> (Start included, End excluded)
    -t, --trim             Keep only header packets that you can decrypt
 

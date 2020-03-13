@@ -12,16 +12,16 @@ The usual ``-h`` flag shows you the different options that the tool accepts.
     Utility for the cryptographic GA4GH standard, reading from stdin and outputting to stdout.
 
     Usage:
-	crypt4gh [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path> [--range <start-end>]
+	crypt4gh [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--range <start-end>]
 	crypt4gh [-hv] [--log <file>] decrypt [--sk <path>] [--sender_pk <path>] [--range <start-end>]
 	crypt4gh [-hv] [--log <file>] rearrange [--sk <path>] --range <start-end>
-	crypt4gh [-hv] [--log <file>] reencrypt [--sk <path>] --recipient_pk <path> [--sender_public_key <path>] [--trim]
+	crypt4gh [-hv] [--log <file>] reencrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--trim]
 
     Options:
 	-h, --help             Prints this help and exit
 	-v, --version          Prints the version and exits
 	--log <file>           Path to the logger file (in YML format)
-	--sk <keyfile>         Curve25519-based Private key [default: ~/.c4gh/key]
+	--sk <keyfile>         Curve25519-based Private key
 	--recipient_pk <path>  Recipient's Curve25519-based Public key
 	--sender_pk <path>     Peer's Curve25519-based Public key to verify provenance (aka, signature)
 	--range <start-end>    Byte-range either as  <start-end> or just <start> (Start included, End excluded)

@@ -7,7 +7,7 @@ The sources for EGA cryptor can be downloaded and installed from the `EGA-archiv
 
 .. code-block:: console
 
-    pip install git+https://github.com/EGA-archive/crypt4gh.git
+    pip install crypt4gh
 
 or using:
 
@@ -16,6 +16,11 @@ or using:
     git clone https://github.com/EGA-archive/crypt4gh
     pip install -r crypt4gh/requirements.txt
     pip install ./crypt4gh
+    #
+    # or just
+    #
+    pip install git+https://github.com/EGA-archive/crypt4gh.git
+
 
 
 .. _EGA-archive Github repo: https://github.com/EGA-archive/crypt4gh

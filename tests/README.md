@@ -54,3 +54,16 @@ We use the testfile and Bob encrypts it for himself.
 
 - [x] Bob encrypts a 10MB file for Alice, and Alice decrypts it, both using their SSH keypair<br/>
       Expected outcome: Alice reads the same content as testfile.
+
+
+## Multiple recipients
+
+
+- [x] Bob sends the testfile secretly to himself and Alice<br/>
+      Expected outcome: They both can read the same content as Bob had.
+
+- [x] Bob encrypts the testfile for himself and reencrypts it for himself and Alice<br/>
+      Expected outcome: They both can read the same content as Bob had.
+
+
+

@@ -67,7 +67,7 @@ def generate(seckey, pubkey, callback=None, comment=None):
     sk = PrivateKey.generate()
     LOG.debug('Private Key: %s', bytes(sk).hex().upper())
 
-    os.umask(0o222) # Restrict to r-- r-- r--
+    os.umask(0o133) # Restrict to rw- r-- r--
 
     with open(pubkey, 'bw', ) as f:
         f.write(b'-----BEGIN CRYPT4GH PUBLIC KEY-----\n')

@@ -57,7 +57,7 @@ function teardown() {
     run diff $TESTFILE $TESTFILES/message.alice.received
     [ "$status" -eq 0 ]
 
-    # Tom decrypts it
+    # Bob decrypts it
     export C4GH_PASSPHRASE=${BOB_PASSPHRASE}
     crypt4gh decrypt --sk ${BOB_SECKEY} < $TESTFILES/message.c4gh > $TESTFILES/message.bob.received
 

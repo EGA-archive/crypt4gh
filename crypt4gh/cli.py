@@ -17,6 +17,7 @@ from .keys import get_public_key, get_private_key
 
 LOG = logging.getLogger(__name__)
 
+C4GH_DEBUG  = os.getenv('C4GH_DEBUG', False)
 DEFAULT_SK  = os.getenv('C4GH_SECRET_KEY', None)
 DEFAULT_LOG = os.getenv('C4GH_LOG', None)
 
@@ -48,6 +49,8 @@ Environment variables:
    C4GH_PASSPHRASE  If defined, it will be used as the passphrase
                     for decoding the secret key, replacing the callback.
                     Note: this is insecure. Only used for testing
+   C4GH_DEBUG       If True, it will print (a lot of) debug information.
+                    (Watch out: the output contains secrets)
  
 '''
 
@@ -63,8 +66,7 @@ def parse_args(argv=sys.argv[1:]):
     logger = args['--log'] or DEFAULT_LOG
     # for the root logger
     logging.basicConfig(stream=sys.stderr,
-                        #level=logging.CRITICAL,
-                        level=logging.DEBUG,
+                        level=logging.DEBUG if C4GH_DEBUG else logging.CRITICAL,
                         format='[%(levelname)s] %(message)s')
     if logger and os.path.exists(logger):
         with open(logger, 'rt') as stream:
@@ -137,7 +139,9 @@ def encrypt(args):
             yield (0, seckey, get_public_key(recipient_pubkey))
 
     # keys = list of (method, privkey, recipient_pubkey=None)
-    recipient_keys = list(build_recipients())
+    # using a set now, instead of inside the generator loop
+    # because we'd remove repetition in case different filenames are used for the same key
+    recipient_keys = set(build_recipients()) # must have at least one, remove repetitions
     if not recipient_keys:
         raise ValueError("No Recipients' Public Key found")
 
@@ -196,7 +200,9 @@ def reencrypt(args):
             yield (0, seckey, get_public_key(recipient_pubkey))
 
     # keys = list of (method, privkey, recipient_pubkey=None)
-    recipient_keys = list(build_recipients())
+    # using a set now, instead of inside the generator loop
+    # because we'd remove repetition in case different filenames are used for the same key
+    recipient_keys = set(build_recipients()) # must have at least one, remove repetitions
     if not recipient_keys:
         raise ValueError("No Recipients' Public Key found")
 

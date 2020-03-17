@@ -7,7 +7,7 @@ from setuptools import setup, find_packages
 _readme = (Path(__file__).parent / "README.md").read_text()
 
 setup(name='crypt4gh',
-      version='1.2',
+      version='1.3',
       url='https://www.github.com/EGA-archive/crypt4gh',
       license='Apache License 2.0',
       author='Frédéric Haziza',

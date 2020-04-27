@@ -14,7 +14,7 @@ function teardown() {
     rm -rf ${TESTFILES}
 }
 
-@test "Bob sends a secret message to Alice, burried in some random data" {
+@test "Bob sends a secret message to Alice, buried in some random data" {
 
     # Original message
     echo -n "Let's have beers in the sauna! or Dinner at 7pm?" > $TESTFILES/message.bob

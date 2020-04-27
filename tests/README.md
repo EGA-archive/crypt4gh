@@ -38,7 +38,7 @@ We use the testfile and Bob encrypts it for himself.
       Expected outcome: Alice reads one "a", 65536 "b"s and one "c".
 
 - [x] Bob sends the secret message `Let's have beers in the sauna! or Dinner at 7pm?` to Alice.
-      The message is burried in the middle of some random data.
+      The message is buried in the middle of some random data.
       Alice decrypts what she receives
       Expected outcome: Alice reads `Let's have beers in the sauna! or Dinner at 7pm?`.
 

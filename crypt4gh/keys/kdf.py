@@ -29,7 +29,8 @@ def get_kdf(kdfname):
 def derive_key(alg, passphrase, salt, rounds, dklen=32):
     if alg == b'scrypt':
         if not scrypt_supported:
-            raise ValueError("scrypt is not supported on this plateform")
+            from ssl import OPENSSL_VERSION
+            raise ValueError("scrypt is not supported on this platform. OpenSSL 1.1.+ required. Current OpenSSL version is: %s", OPENSSL_VERSION)
         return scrypt(passphrase, salt=salt, n=1<<14, r=8, p=1, dklen=dklen)
     if alg == b'bcrypt':
         import bcrypt

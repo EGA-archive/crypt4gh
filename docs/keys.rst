@@ -46,6 +46,6 @@ The only supported cipher is ``chacha20_poly1305`` (so far), or ``none``.
 When kdfname is none, so should the ciphername be (and vice-versa), and the ``(rounds || salt)`` string is not included. This is used when the key material is not encrypted.
 
 In case the key material is encrypted, the KDF is used to derive a secret from a user-supplied passphrase.
-A nonce is randomly generated, and used in conjonction with the secret to encrypt the private key, using Chacha20 and authenticated with Poly1305. The nonce is prepended to the encrypted data.
+A nonce is randomly generated, and used in conjunction with the secret to encrypt the private key, using Chacha20 and authenticated with Poly1305. The nonce is prepended to the encrypted data.
 
 Finally, an optional comment can be used at the end of the encoded format.

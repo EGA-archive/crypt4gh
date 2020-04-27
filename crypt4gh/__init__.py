@@ -28,7 +28,7 @@ cryptographic file format."""
 # Knowing that the range <start-end> is applied to the "decrypted file" (ie the original content, as if no encryption was applied),
 # we have the two following cases:
 # - there is no Edit List: we fast-forward to the relevant cipher block (as <start-end> states).
-# - there is an Edit List: we reject the file if a cipher block is entirely skipped (independantly of the <start-end> range).
+# - there is an Edit List: we reject the file if a cipher block is entirely skipped (independently of the <start-end> range).
 # (If edit list and range are both used: we decipher each block and then apply the range)
 #
 #

@@ -83,7 +83,14 @@ def decode_string(stream):
     return data
 
 
-def _get_skpk_from_private_blob(blob):
+def _get_skpk_from_decrypted_private_blob(blob):
+
+    checkint1 = blob.read(4)
+    checkint2 = blob.read(4)
+    if checkint1 != checkint2:
+        LOG.error('Check: %s != %s', checkint1, checkint2)
+        raise CryptoError()
+
     # We should parse n keys, but n is 1
     decode_string(blob) # ignore key name
     decode_string(blob) # ignore pubkey
@@ -146,9 +153,9 @@ def parse_private_key(stream, callback):
     assert not stream.read(), "There should be no trailing data"
 
     if ciphername == b'none':
-        # LOG.debug('Non-Encrypted private data: %s', private_data)
+        # LOG.debug('Non-Encrypted private data: %s', private_ciphertext)
         private_data = io.BytesIO(private_ciphertext) # no need to unpad
-        return _get_skpk_from_private_blob(private_data) # ignore the comment
+        return _get_skpk_from_decrypted_private_blob(private_data) # ignore the comment
 
     # Encrypted content
     # LOG.debug('------ Encrypted private data (%d): %s', len(private_ciphertext), private_ciphertext)
@@ -168,12 +175,8 @@ def parse_private_key(stream, callback):
     private_data = decryptor.update(private_ciphertext) + decryptor.finalize()
     # LOG.debug('------- Private data (%d): %s', len(private_data), private_data)
 
-    if private_data[:4] != private_data[4:8]: # check don't pass
-        LOG.debug('Check: %s != %s', private_data[:4], private_data[4:8])
-        raise CryptoError()
-    private_data = io.BytesIO(private_data[8:])
     # Note: we ignore the comment and padding after the priv blob
-    return _get_skpk_from_private_blob(private_data) # no need to unpad
+    return _get_skpk_from_decrypted_private_blob(io.BytesIO(private_data)) # no need to unpad
 
 
 
@@ -189,5 +192,3 @@ def get_public_key(line):
     pubkey_bytes = decode_string(stream) # the rest is the ED25519 public key: it should be 32 bytes
     # Converting
     return crypto_sign_ed25519_pk_to_curve25519(pubkey_bytes)
-    
-

@@ -66,18 +66,36 @@ Environment variables:
 
 def load_from_pem(filepath):
     with open(filepath, 'rb') as f:
-        lines = f.readlines()
-        assert( lines[0].startswith(b'-----BEGIN '))
-        assert( lines[-1].startswith(b'-----END '))
+        lines = []
+
+        # Strip empty lines and newline characters
+        for l in f.readlines():
+            l = l.strip()
+            if l:
+                lines.append(l)
+
+        if (not lines
+            or not lines[0].startswith(b'-----BEGIN ')
+            or not lines[-1].startswith(b'-----END ')
+            ):
+            raise ValueError('Not a PEM format')
+
         return b64decode(b''.join(lines[1:-1]))
 
 def get_public_key(filepath):
     '''Read the public key from keyfile location.'''
 
     with open(filepath, 'rb') as f:
-        lines = f.readlines()
+        lines = []
+
+        # Strip empty lines and newline characters
+        for l in f.readlines():
+            l = l.strip()
+            if l:
+                lines.append(l)
+
         if not lines:
-            raise NotImplementedError('Empty key')
+            raise ValueError('Empty key')
 
         line = lines[0]
 
@@ -151,14 +169,25 @@ def run(argv=sys.argv[1:]):
             os.remove(k)
 
     comment = args['-C'].encode() if args['-C'] else None
-    do_crypt = not args['--nocrypt']
-    cb = partial(getpass, prompt=f'Passphrase for {args["--sk"]}: ') if do_crypt else None
-    
-    c4gh.generate(seckey, pubkey, callback=cb, comment=comment)
+
+    print("Generating public/private Crypt4GH key pair{}.".format(f" (for {args['-C']}" if comment else ""))
+    passphrase1 = passphrase2 = None
+    if not args['--nocrypt']:
+        passphrase1 = getpass(prompt=f'Enter passphrase for {args["--sk"]} (empty for no passphrase): ').encode()
+        passphrase2 = getpass(prompt=f'Enter passphrase for {args["--sk"]} (again): ').encode()
+
+    if passphrase1 != passphrase2: # including None=None
+        print('Passphrases do not match', file=sys.stderr)
+        return 1
+
+    c4gh.generate(seckey, pubkey, passphrase=passphrase1, comment=comment)
+    print("Your private key has been saved in", seckey)
+    print("Your public key has been saved in", pubkey)
+    return 0
 
 def main(argv=sys.argv[1:]):
     try:
-        run(argv)
+        sys.exit(run(argv))
     except KeyboardInterrupt:
         pass
     # except Exception as e:

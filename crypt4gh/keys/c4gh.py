@@ -60,7 +60,7 @@ def encode_private_key(key, passphrase, comment):
 	    (encode_string(comment) if comment is not None else b'')) # optional comment
 
 
-def generate(seckey, pubkey, callback=None, comment=None):
+def generate(seckey, pubkey, passphrase=None, comment=None):
     '''Generate a keypair.'''
 
     # Generate the keys
@@ -78,8 +78,8 @@ def generate(seckey, pubkey, callback=None, comment=None):
 
     os.umask(0o277) # Restrict to r-- --- ---
 
+    # open the file
     with open(seckey, 'bw') as f:
-        passphrase = callback().encode() if callback else None
         pkey = encode_private_key(sk, passphrase, comment)
         LOG.debug('Encoded Private Key: %s', pkey.hex().upper())
 

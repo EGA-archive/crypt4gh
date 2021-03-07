@@ -8,8 +8,6 @@ import io
 import logging
 import logging.config
 from base64 import b64decode, b64encode
-#import traceback
-from functools import partial
 from getpass import getpass
 
 from docopt import docopt
@@ -191,6 +189,7 @@ def main(argv=sys.argv[1:]):
     except KeyboardInterrupt:
         pass
     # except Exception as e:
+    #     import traceback
     #     _, _, exc_tb = sys.exc_info()
     #     traceback.print_tb(exc_tb, file=sys.stderr)
     #     sys.exit(1)

@@ -67,15 +67,6 @@ def generate(seckey, pubkey, passphrase=None, comment=None):
     sk = PrivateKey.generate()
     LOG.debug('Private Key: %s', bytes(sk).hex().upper())
 
-    os.umask(0o133) # Restrict to rw- r-- r--
-
-    with open(pubkey, 'bw', ) as f:
-        f.write(b'-----BEGIN CRYPT4GH PUBLIC KEY-----\n')
-        pkey = bytes(sk.public_key)
-        LOG.debug('Public Key: %s', pkey.hex().upper())
-        f.write(b64encode(pkey))
-        f.write(b'\n-----END CRYPT4GH PUBLIC KEY-----\n')
-
     os.umask(0o277) # Restrict to r-- --- ---
 
     # open the file
@@ -86,6 +77,15 @@ def generate(seckey, pubkey, passphrase=None, comment=None):
         f.write(b'-----BEGIN CRYPT4GH PRIVATE KEY-----\n')
         f.write(b64encode(pkey))
         f.write(b'\n-----END CRYPT4GH PRIVATE KEY-----\n')
+
+    os.umask(0o133) # Restrict to rw- r-- r--
+
+    with open(pubkey, 'bw', ) as f:
+        f.write(b'-----BEGIN CRYPT4GH PUBLIC KEY-----\n')
+        pkey = bytes(sk.public_key)
+        LOG.debug('Public Key: %s', pkey.hex().upper())
+        f.write(b64encode(pkey))
+        f.write(b'\n-----END CRYPT4GH PUBLIC KEY-----\n')
 
 
 #######################################################################

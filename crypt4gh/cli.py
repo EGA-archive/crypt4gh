@@ -134,7 +134,8 @@ def encrypt(args):
         for pk in args['--recipient_pk']:
             recipient_pubkey = os.path.expanduser(pk)
             if not os.path.exists(recipient_pubkey):
-                continue
+                msg = f"Recipient pubkey: {recipient_pubkey}, does not exist"
+                raise ValueError(msg)
             LOG.debug("Recipient pubkey: %s", recipient_pubkey)
             yield (0, seckey, get_public_key(recipient_pubkey))
 
@@ -195,7 +196,8 @@ def reencrypt(args):
         for pk in args['--recipient_pk']:
             recipient_pubkey = os.path.expanduser(pk)
             if not os.path.exists(recipient_pubkey):
-                continue
+                msg = f"Recipient pubkey: {recipient_pubkey}, does not exist"
+                raise ValueError(msg)
             LOG.debug("Recipient pubkey: %s", recipient_pubkey)
             yield (0, seckey, get_public_key(recipient_pubkey))
 

@@ -47,7 +47,7 @@ function teardown() {
     export C4GH_PASSPHRASE=${BOB_PASSPHRASE}
     crypt4gh encrypt --sk ${BOB_SECKEY} --recipient_pk ${BOB_PUBKEY} < $TESTFILE > $TESTFILES/message.bob.c4gh
 
-    # Bob changes the header for Alice and Tom
+    # Bob changes the header for Alice and Bob
     crypt4gh reencrypt --sk ${BOB_SECKEY} --recipient_pk ${BOB_PUBKEY} --recipient_pk ${ALICE_PUBKEY} < $TESTFILES/message.bob.c4gh > $TESTFILES/message.c4gh
 
     # Alice decrypts it

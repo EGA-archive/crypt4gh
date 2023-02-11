@@ -64,8 +64,8 @@ def parse_args(argv=sys.argv[1:]):
     logging.basicConfig(stream=sys.stderr, level=logging.CRITICAL) # for the root logger
     if logger and os.path.exists(logger):
         with open(logger, 'rt') as stream:
-            import yaml
-            logging.config.dictConfig(yaml.safe_load(stream))
+            import json
+            logging.config.dictConfig(json.load(stream))
 
     # I prefer to clean up
     for s in ['--log', '--help', '--version']:#, 'help', 'version']:
@@ -97,7 +97,7 @@ def output(args):
     infile = sys.stdin.buffer
     keys = [(0, seckey, None)]
 
-    edits = None
+    sequence_number = None
     for i, packet in enumerate(header.parse(infile), start=1):
 
         decrypted_packet = header.decrypt_packet(packet, keys, sender_pubkey=sender_pubkey)
@@ -115,20 +115,22 @@ def output(args):
             session_key = header.parse_enc_packet(packet_content)
             print(f'# packet {i} session key: {session_key.hex()}')
 
-        elif packet_type == header.PACKET_TYPE_EDIT_LIST:
-            if edits is not None: # reject files if many edit list packets
+        elif packet_type == header.PACKET_TYPE_SEQUENCE_NUMBER:
+            if sequence_number is not None: # reject files if many edit list packets
                 raise ValueError('Invalid file: Too many edit list packets')
-            edits = packet_content, i
+            sequence_number = packet_content, i
 
         else:
             packet_type = int.from_bytes(packet_type, byteorder='little')
             print(f'Packet {i}: Invalid packet (type: {packet_type})')
 
 
-    if edits is not None:
-        LOG.debug(f'# Packet {edits[1]} Edit list: {edits[0].hex()}')
-        edit_list = list(header.parse_edit_list_packet(edits[0]))
-        print(f'# Packet {edits[1]} Edit list: {edit_list}')
+    if sequence_number is None:
+        sequence_number = 0
+        print('# No sequence number, defaulting to 0')
+    else:
+        print(f'# Packet {sequence_number[1]} sequence number: {sequence_number[0]}')
+        sequence_number = sequence_number[0]
 
 
     # Scanning through the remainder and print the number of data blocks

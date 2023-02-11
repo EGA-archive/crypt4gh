@@ -26,9 +26,8 @@ __doc__ = f'''
 Utility for the cryptographic GA4GH standard, reading from stdin and outputting to stdout.
 
 Usage:
-   {PROG} [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--range <start-end>]
-   {PROG} [-hv] [--log <file>] decrypt [--sk <path>] [--sender_pk <path>] [--range <start-end>]
-   {PROG} [-hv] [--log <file>] rearrange [--sk <path>] --range <start-end>
+   {PROG} [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]...
+   {PROG} [-hv] [--log <file>] decrypt [--sk <path>] [--sender_pk <path>]
    {PROG} [-hv] [--log <file>] reencrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--trim]
 
 Options:
@@ -39,7 +38,6 @@ Options:
                           When encrypting, if neither the private key nor C4GH_SECRET_KEY are specified, we generate a new key 
    --recipient_pk <path>  Recipient's Curve25519-based Public key
    --sender_pk <path>     Peer's Curve25519-based Public key to verify provenance (akin to signature)
-   --range <start-end>    Byte-range either as  <start-end> or just <start> (Start included, End excluded)
    -t, --trim             Keep only header packets that you can decrypt
 
 
@@ -70,34 +68,15 @@ def parse_args(argv=sys.argv[1:]):
                         format='[%(levelname)s] %(message)s')
     if logger and os.path.exists(logger):
         with open(logger, 'rt') as stream:
-            import yaml
-            logging.config.dictConfig(yaml.safe_load(stream))
+            import json
+            logging.config.dictConfig(json.load(stream))
 
     # I prefer to clean up
     for s in ['--log', '--help', '--version']:#, 'help', 'version']:
         del args[s]
 
-    # print(args)
     return args
 
-
-range_re = re.compile(r'([\d]+)-([\d]+)?')
-
-def parse_range(args):
-    r = args['--range']
-    if not r:
-        return (0, None)
-
-    m = range_re.match(r)
-    if m is None:
-        raise ValueError(f"Invalid range: {args['--range']}")
-    
-    start, end = m.groups()  # end might be None
-    start, end = int(start), (int(end) if end else None)
-    span = end - start - 1 if end else None
-    if not span:
-        raise ValueError(f"Invalid range: {args['--range']}")
-    return (start, span)
 
 def retrieve_private_key(args, generate=False):
 
@@ -126,8 +105,6 @@ def retrieve_private_key(args, generate=False):
 def encrypt(args):
     assert( args['encrypt'] )
 
-    range_start, range_span = parse_range(args)
-
     seckey = retrieve_private_key(args, generate=True)
 
     def build_recipients():
@@ -148,17 +125,13 @@ def encrypt(args):
 
     lib.encrypt(recipient_keys,
                 sys.stdin.buffer,
-                sys.stdout.buffer,
-                offset = range_start,
-                span = range_span)
+                sys.stdout.buffer)
     
 
 def decrypt(args):
     assert( args['decrypt'] )
 
     sender_pubkey = get_public_key(os.path.expanduser(args['--sender_pk'])) if args['--sender_pk'] else None
-
-    range_start, range_span = parse_range(args)
 
     seckey = retrieve_private_key(args)
 
@@ -167,25 +140,8 @@ def decrypt(args):
     lib.decrypt(keys,
                 sys.stdin.buffer,
                 sys.stdout.buffer,
-                offset = range_start,
-                span = range_span,
                 sender_pubkey=sender_pubkey)
 
-
-def rearrange(args):
-    assert( args['rearrange'] )
-
-    range_start, range_span = parse_range(args)
-
-    seckey = retrieve_private_key(args)
-
-    keys = [(0, seckey, bytes(PrivateKey(seckey).public_key))] # keys = list of (method, privkey, recipient_pubkey=ourselves)
-
-    lib.rearrange(keys,
-                  sys.stdin.buffer,
-                  sys.stdout.buffer,
-                  offset = range_start,
-                  span = range_span)
 
 def reencrypt(args):
     assert( args['reencrypt'] )

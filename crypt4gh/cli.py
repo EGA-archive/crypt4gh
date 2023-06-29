@@ -26,10 +26,10 @@ __doc__ = f'''
 Utility for the cryptographic GA4GH standard, reading from stdin and outputting to stdout.
 
 Usage:
-   {PROG} [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--range <start-end>]
-   {PROG} [-hv] [--log <file>] decrypt [--sk <path>] [--sender_pk <path>] [--range <start-end>]
+   {PROG} [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--range <start-end>] [--header <path] [--data <path>]
+   {PROG} [-hv] [--log <file>] decrypt [--sk <path>] [--sender_pk <path>] [--range <start-end>] [--header <path] [--data <path>]
    {PROG} [-hv] [--log <file>] rearrange [--sk <path>] --range <start-end>
-   {PROG} [-hv] [--log <file>] reencrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--trim]
+   {PROG} [-hv] [--log <file>] reencrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--trim] [--header-only]
 
 Options:
    -h, --help             Prints this help and exit
@@ -41,7 +41,9 @@ Options:
    --sender_pk <path>     Peer's Curve25519-based Public key to verify provenance (akin to signature)
    --range <start-end>    Byte-range either as  <start-end> or just <start> (Start included, End excluded)
    -t, --trim             Keep only header packets that you can decrypt
-
+   --header <path>        Where to write crypt4gh header (default: stdout)
+   --data <path>          Where to write crypt4gh payload (default: stdout)
+   --header-only          Only write reencrypted header to file, skip payload
 
 Environment variables:
    C4GH_LOG         If defined, it will be used as the default logger
@@ -146,12 +148,23 @@ def encrypt(args):
     if not recipient_keys:
         raise ValueError("No Recipients' Public Key found")
 
-    lib.encrypt(recipient_keys,
-                sys.stdin.buffer,
-                sys.stdout.buffer,
-                offset = range_start,
-                span = range_span)
-    
+    if "--header" in args and "--data" in args:
+        with (open(args["--header"], "wb") as header_out,
+              open(args["--data"], "wb") as data_out):
+            lib.encrypt(recipient_keys,
+                        sys.stdin.buffer,
+                        header_out,
+                        data_out,
+                        offset = range_start,
+                        span = range_span)
+    else:
+        lib.encrypt(recipient_keys,
+                    sys.stdin.buffer,
+                    sys.stdout.buffer,
+                    sys.stdout.buffer,
+                    offset = range_start,
+                    span = range_span)
+
 
 def decrypt(args):
     assert( args['decrypt'] )
@@ -164,12 +177,25 @@ def decrypt(args):
 
     keys = [(0, seckey, None)] # keys = list of (method, privkey, recipient_pubkey=None)
 
-    lib.decrypt(keys,
-                sys.stdin.buffer,
-                sys.stdout.buffer,
-                offset = range_start,
-                span = range_span,
-                sender_pubkey=sender_pubkey)
+    # XXX "in" doesn't work this way with docopt
+    if "--header" in args and "--data" in args:
+        with (open(args["--header"], "rb") as header_in,
+              open(args["--data"], "rb") as data_in):
+            lib.decrypt(keys,
+                        header_in,
+                        data_in,
+                        sys.stdout.buffer,
+                        offset = range_start,
+                        span = range_span,
+                        sender_pubkey=sender_pubkey)
+    else:
+        lib.decrypt(keys,
+                    sys.stdin.buffer,
+                    sys.stdin.buffer,
+                    sys.stdout.buffer,
+                    offset = range_start,
+                    span = range_span,
+                    sender_pubkey=sender_pubkey)
 
 
 def rearrange(args):
@@ -212,4 +238,5 @@ def reencrypt(args):
                   recipient_keys,
                   sys.stdin.buffer,
                   sys.stdout.buffer,
-                  trim=args['--trim'])
+                  trim=args['--trim'],
+                  header_only=args["--header-only"])

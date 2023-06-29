@@ -46,7 +46,7 @@ def _encrypt_segment(data, process, key):
 
 
 @close_on_broken_pipe
-def encrypt(keys, infile, outfile, offset=0, span=None):
+def encrypt(keys, infile, outfile_header, outfile_data, offset=0, span=None):
     '''Encrypt infile into outfile, using the list of keys.
 
 
@@ -91,7 +91,7 @@ def encrypt(keys, infile, outfile, offset=0, span=None):
     header_bytes = header.serialize(header_packets)
 
     LOG.debug('header length: %d', len(header_bytes))
-    outfile.write(header_bytes)
+    outfile_header.write(header_bytes)
 
     # ...and cue music
     LOG.debug("Streaming content")
@@ -109,11 +109,11 @@ def encrypt(keys, infile, outfile, offset=0, span=None):
 
             if segment_len < SEGMENT_SIZE: # not a full segment
                 data = bytes(segment[:segment_len]) # to discard the bytes from the previous segments
-                _encrypt_segment(data, outfile.write, session_key)
+                _encrypt_segment(data, outfile_data.write, session_key)
                 break
 
             data = bytes(segment) # this is a full segment
-            _encrypt_segment(data, outfile.write, session_key)
+            _encrypt_segment(data, outfile_data.write, session_key)
 
     else: # we have a max size
         assert( span )
@@ -129,10 +129,10 @@ def encrypt(keys, infile, outfile, offset=0, span=None):
 
             if span < segment_len: # stop early
                 data = data[:span]
-                _encrypt_segment(data, outfile.write, session_key)
+                _encrypt_segment(data, outfile_data.write, session_key)
                 break
 
-            _encrypt_segment(data, outfile.write, session_key)
+            _encrypt_segment(data, outfile_data.write, session_key)
 
             span -= segment_len
 
@@ -356,7 +356,7 @@ def body_decrypt_parts(infile, session_keys, output, edit_list=None):
 
 
 @close_on_broken_pipe
-def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
+def decrypt(keys, infile_header, infile_data, outfile, sender_pubkey=None, offset=0, span=None):
     '''Decrypt infile into outfile, using a given set of keys.
 
     If sender_pubkey is specified, it verifies the provenance of the header.
@@ -375,7 +375,7 @@ def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
         )
     )
 
-    session_keys, edit_list = header.deconstruct(infile, keys, sender_pubkey=sender_pubkey)
+    session_keys, edit_list = header.deconstruct(infile_header, keys, sender_pubkey=sender_pubkey)
 
     # Infile in now positioned at the beginning of the data portion
 
@@ -385,11 +385,11 @@ def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
 
     if edit_list is None:
         # No edit list: decrypt all segments until the end
-        body_decrypt(infile, session_keys, output, offset)
+        body_decrypt(infile_data, session_keys, output, offset)
         # We could use body_decrypt_parts but there is an inner buffer, and segments might not be aligned
     else:
         # Edit list: it drives which segments is decrypted
-        body_decrypt_parts(infile, session_keys, output, edit_list=list(edit_list))
+        body_decrypt_parts(infile_data, session_keys, output, edit_list=list(edit_list))
 
     LOG.info('Decryption Over')
 
@@ -402,7 +402,7 @@ def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
 
 
 @close_on_broken_pipe
-def reencrypt(keys, recipient_keys, infile, outfile, chunk_size=4096, trim=False):
+def reencrypt(keys, recipient_keys, infile, outfile, chunk_size=4096, trim=False, header_only=False):
     '''Extract header packets from infile and generate another one to outfile.
     The encrypted data section is only copied from infile to outfile.'''
 
@@ -410,6 +410,9 @@ def reencrypt(keys, recipient_keys, infile, outfile, chunk_size=4096, trim=False
     header_packets = header.parse(infile)
     packets = header.reencrypt(header_packets, keys, recipient_keys, trim=trim)
     outfile.write(header.serialize(packets))
+
+    if header_only:
+        return
 
     # Stream the remainder
     LOG.info(f'Streaming the remainder of the file')

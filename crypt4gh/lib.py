@@ -213,13 +213,20 @@ def encrypt_aad(keys, infile, outfile):
 ##
 ##############################################################
 
-def cipher_chunker(f, size):
+def cipher_chunker(f, size, with_aad=False):
+    trailing_segment = False
     while True:
         ciphersegment = f.read(size)
         ciphersegment_len = len(ciphersegment)
         if ciphersegment_len == 0: 
+            if with_aad and not trailing_segment:
+                raise ValueError('Missing trailing segment')
             break # We were at the last segment. Exits the loop
-        assert( ciphersegment_len > CIPHER_DIFF )
+        if with_aad and ciphersegment_len == CIPHER_DIFF: 
+            # We were at the last empty segment. Only check if the final AEAD segment is correct
+            trailing_segment = True
+        else:
+            assert( ciphersegment_len > CIPHER_DIFF )
         yield ciphersegment
 
 def decrypt_block(ciphersegment, session_keys, aad=None):
@@ -436,7 +443,7 @@ def body_decrypt_aad(infile, session_keys, output, offset, aead_seq):
     # Decrypt all segments until the end
     LOG.debug('aad: %s', header.sequence_number_to_binstr(aad))
     try:
-        for ciphersegment in cipher_chunker(infile, CIPHER_SEGMENT_SIZE):
+        for ciphersegment in cipher_chunker(infile, CIPHER_SEGMENT_SIZE, with_aad=True): # error if missing last segment
             segment = decrypt_block(ciphersegment, session_keys, aad=aead_seq)
             output.send(segment)
             aead_seq = bitwise_add_one(aead_seq)

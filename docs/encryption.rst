@@ -25,3 +25,27 @@ The advantages of the format are, among others:
 * Re-encrypting the file for another user requires only to decrypt the header and encrypt it with the user's public key.
 * Header packets can be encrypted for multiple recipients.
 * Re-arranging the file to chunk a portion requires only to decrypt the header, re-encrypt with an edit list, and select the cipher segments surrounding the portion. The file itself is not decrypted and reencrypted.
+
+
+AEAD mode
+---------
+
+The procedure to use the AEAD mode is as follows: |br| We randomly
+pick a number, and create an incrementing sequence starting at that
+number (We limit the number to 4 bytes, so the sequence can eventually
+wrap around). |br| For each encrypted segment, in order, we attach the
+number we pop from the sequence. |br| In case the end of the file
+lands on a segment boundary, we also encrypt an empty segment, using
+the incrementing sequence, and add it as last encrypted segment.
+
+The AEAD mode ensures no segments can be lost or re-ordered.
+
+It is the default mode and the non-AEAD mode is kept for backwards compatibility using the ``-n`` switch (See :ref:`Usage & Examples <cli-usage>`).
+
+In the AEAD mode, the header contains at least 2 packets: A list of data encryption packets with method ``1`` and a sequence number packet with the initial sequence number from the above sequence.
+
+.. note:: In this mode, data encryption methods can't be mixed, and edit lists are not supported.
+
+.. |br| raw:: html
+
+   <br />

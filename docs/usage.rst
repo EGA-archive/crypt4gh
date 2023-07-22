@@ -5,6 +5,8 @@ Usage & Examples
 
 The usual ``-h`` flag shows you the different options that the tool accepts.
 
+.. _cli-usage:
+
 .. code-block:: console
 
     $ crypt4gh -h
@@ -12,10 +14,10 @@ The usual ``-h`` flag shows you the different options that the tool accepts.
     Utility for the cryptographic GA4GH standard, reading from stdin and outputting to stdout.
 
     Usage:
-	crypt4gh [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--range <start-end>]
+	crypt4gh [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--range <start-end>] [--no_aad]
 	crypt4gh [-hv] [--log <file>] decrypt [--sk <path>] [--sender_pk <path>] [--range <start-end>]
-	crypt4gh [-hv] [--log <file>] rearrange [--sk <path>] --range <start-end>
 	crypt4gh [-hv] [--log <file>] reencrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--trim]
+	crypt4gh [-hv] [--log <file>] rearrange [--sk <path>] --range <start-end>
 
     Options:
 	-h, --help             Prints this help and exit
@@ -25,9 +27,12 @@ The usual ``-h`` flag shows you the different options that the tool accepts.
 	                       When encrypting, if neither the private key nor C4GH_SECRET_KEY are specified, we generate a new key 
 	--recipient_pk <path>  Recipient's Curve25519-based Public key
 	--sender_pk <path>     Peer's Curve25519-based Public key to verify provenance (aka, signature)
-	--range <start-end>    Byte-range either as  <start-end> or just <start> (Start included, End excluded)
 	-t, --trim             Keep only header packets that you can decrypt
+	-n, --no_aad           Disable AEAD (Authenticated Encryption with Associated Data)
+	--range <start-end>    Byte-range either as  <start-end> or just <start> (Start included, End excluded)
 
+    Notes:
+        The "rearrange" command only works without AEAD
 
     Environment variables:
 	C4GH_LOG         If defined, it will be used as the default logger

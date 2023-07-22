@@ -42,14 +42,22 @@ which should output, something along those lines (yes, the testsuite might grow)
 
 .. code-block:: console
 
-   ✓ Bob sends a secret (random) 10MB file to Alice
-   ✓ Bob sends the testfile secretly to Alice
-   ✓ Bob encrypts the testfile for himself and reencrypts it for Alice
-   ✓ Bob sends only the Bs from the testfile secretly to Alice
-   ✓ Bob sends one A, all Bs, one C, from the testfile secretly to Alice
-   ✓ Bob rearranges the encrypted testfile to send one A, all Bs, one C, to Alice
-   ✓ Bob sends only the Bs from the testfile secretly to Alice
-   ✓ Bob sends one A, all Bs, one C, from the testfile secretly to Alice
-   ✓ Bob rearranges the encrypted testfile to send one A, all Bs, one C, to Alice
-   
-   10 tests, 0 failures
+    ✓ Bob sends a secret message to Alice, buried in some random data
+    ✓ Bob sends a secret (random) 10MB file to Alice
+    ✓ Bob sends the testfile secretly to Alice
+    ✓ Bob encrypts the testfile for himself and reencrypts it for Alice
+    ✓ Bob sends a secret (random) 10MB file to Alice, without his key
+    ✓ Bob sends a secret (random) 10MB file to Alice (no AEAD)
+    ✓ Bob sends the testfile secretly to Alice (no AEAD)
+    ✓ Bob encrypts the testfile for himself and reencrypts it for Alice (no AEAD)
+    ✓ Bob sends a secret (random) 10MB file to Alice, without his key (no AEAD)
+    ✓ Bob sends a secret (random) 10MB file to Alice, using his ssh-key
+    ✓ Bob sends a secret (random) 10MB file to Alice, using Alice's ssh-key
+    ✓ Bob sends a secret (random) 10MB file to Alice, both using their ssh-keys
+    ✓ Bob sends the testfile secretly to himself and Alice
+    ✓ Bob encrypts the testfile for himself and reencrypts it for himself and Alice
+    ✓ Bob sends only the Bs from the testfile secretly to Alice
+    ✓ Bob sends one A, all Bs, one C, from the testfile secretly to Alice
+    ✓ Bob rearranges the encrypted testfile to send one A, all Bs, one C, to Alice
+
+    17 tests, 0 failures

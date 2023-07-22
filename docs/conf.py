@@ -129,9 +129,6 @@ html_sidebars = {
 
 today_fmt = '%B %d, %Y'
 
-def setup(app):
-    app.add_stylesheet('custom.css')
-
 # -- Other stuff ----------------------------------------------------------
 htmlhelp_basename = 'crypt4gh'
 latex_elements = {}

@@ -132,6 +132,7 @@ def partition_packets(packets):
 # Encrypted data packet
 # -------------------------------------
 def make_packet_data_enc(encryption_method, session_key):
+    LOG.debug('------ SESSION KEY: %s', session_key.hex())
     return (PACKET_TYPE_DATA_ENC
             + encryption_method.to_bytes(4,'little') 
             + session_key)
@@ -143,6 +144,7 @@ def parse_enc_packet(packet):
     if encryption_method in (b'\x00\x00\x00\x00', # 0 little endian
                              b'\x01\x00\x00\x00' # 1 little endian
                              ): 
+        LOG.debug('------ SESSION KEY: %s', packet[8:].hex())
         return packet[8:]
 
     LOG.warning('Unsupported bulk encryption method: %s', encryption_method)
@@ -184,22 +186,16 @@ def parse_edit_list_packet(packet):
 # -------------------------------------
 # AEAD sequence packet
 # -------------------------------------
-def make_packet_sequence_number(sequence_number):
+def make_packet_sequence_number(sequence_number: bytes):
+    assert (len(sequence_number) == 4)
     return (PACKET_TYPE_SEQUENCE_NUMBER
-#            + sequence_number.to_bytes(4,'little'))
             + sequence_number) # don't bother about endianness
 
 def parse_sequence_number_packet(packet):
     '''Returns the sequence number for the AEAD encrypted'''
     assert( packet[:4] == PACKET_TYPE_SEQUENCE_NUMBER )
     assert( len(packet) == 8 )
-    #return int.from_bytes(packet[4:8], byteorder='little')
-    return packet[4:8]
-
-def sequence_number_to_binstr(sequence_number):
-    assert( isinstance(sequence_number, bytes) and len(sequence_number) == 4 )
-    n = int.from_bytes(sequence_number, byteorder='little', signed=False)
-    return f'{n:b}'
+    return int.from_bytes(packet[4:8], byteorder='little', signed=False)
 
 # -------------------------------------
 # Header Encryption Methods Conventions
@@ -361,7 +357,7 @@ def deconstruct(infile, keys, sender_pubkey=None):
     # Parse returns the session key (since it should be method 0) 
     session_keys = [parse_enc_packet(packet) for packet in data_packets]
     edit_list = parse_edit_list_packet(edit_packet) if edit_packet else None
-    aead_seq = parse_sequence_number_packet(aead_packet) if aead_packet else b'\x00\x00\x00\x00' # 0 as 4-bytes
+    aead_seq = parse_sequence_number_packet(aead_packet) if aead_packet else None
     return session_keys, edit_list, aead_seq
 
 # -------------------------------------
@@ -461,9 +457,8 @@ def rearrange(header_packets, keys, offset=0, span=None, sender_pubkey=None):
 
     LOG.info('Reencrypting all packets')
 
-    packets = [PACKET_TYPE_DATA_ENC + packet for packet in data_packets]
-    packets.append(edit_packet) # adding the edit list at the end
-    packets = [encrypted_packet for packet in packets for encrypted_packet in encrypt(packet, keys)]
+    data_packets.append(edit_packet) # adding the edit list at the end
+    packets = [encrypted_packet for packet in data_packets for encrypted_packet in encrypt(packet, keys)]
 
     return packets, segment_oracle()
 

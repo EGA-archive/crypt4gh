@@ -227,6 +227,8 @@ def cipher_chunker(f, size, with_aad=False):
             trailing_segment = True
         else:
             assert( ciphersegment_len > CIPHER_DIFF )
+            if with_aad and ciphersegment_len < CIPHER_SEGMENT_SIZE:
+                trailing_segment = True
         yield ciphersegment
 
 def decrypt_block(ciphersegment, session_keys, aad=None):

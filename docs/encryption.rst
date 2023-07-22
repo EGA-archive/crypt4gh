@@ -42,7 +42,7 @@ The AEAD mode ensures no segments can be lost or re-ordered.
 
 It is the default mode and the non-AEAD mode is kept for backwards compatibility using the ``-n`` switch (See :ref:`Usage & Examples <cli-usage>`).
 
-In the AEAD mode, the header contains at least 2 packets: A list of data encryption packets with method ``1`` and a sequence number packet with the initial sequence number from the above sequence.
+In the AEAD mode, the header contains at least 2 packets: a sequence number packet with the initial sequence number from the above sequence and a data encryption packet (or more) with method ``1``.
 
 .. note:: In this mode, data encryption methods can't be mixed, and edit lists are not supported.
 

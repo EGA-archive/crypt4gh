@@ -50,6 +50,13 @@ import sys
 import logging
 LOG = logging.getLogger(__name__)
 
+# Send warnings using the package warnings to the logging system
+# The warnings are logged to a logger named 'py.warnings' with a severity of WARNING.
+# See: https://docs.python.org/3/library/logging.html#integration-with-the-warnings-module
+import warnings
+logging.captureWarnings(True)
+warnings.simplefilter("default")  # do not ignore Deprecation Warnings
+
 # For this verion: Data blocks are bounded to that specific size
 VERSION = 1
 SEGMENT_SIZE = 65536

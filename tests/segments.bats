@@ -21,7 +21,7 @@ function teardown() {
 
     # Bob encrypts the testfile for Alice
     export C4GH_PASSPHRASE=${BOB_PASSPHRASE}
-    crypt4gh encrypt --sk ${BOB_SECKEY} --recipient_pk ${ALICE_PUBKEY} --range 65536-131073 < $TESTFILE > $TESTFILES/message.b.c4gh
+    crypt4gh encrypt --sk ${BOB_SECKEY} --recipient_pk ${ALICE_PUBKEY} --range 65536-131073 -n < $TESTFILE > $TESTFILES/message.b.c4gh
 
     # Alice decrypts it
     export C4GH_PASSPHRASE=${ALICE_PASSPHRASE}
@@ -46,7 +46,7 @@ function teardown() {
     
     # Bob encrypts the testfile for Alice
     export C4GH_PASSPHRASE=${BOB_PASSPHRASE}
-    crypt4gh encrypt --sk ${BOB_SECKEY} --recipient_pk ${ALICE_PUBKEY} --range 65535-131074 < $TESTFILE > $TESTFILES/message.abbbc.c4gh
+    crypt4gh encrypt --sk ${BOB_SECKEY} --recipient_pk ${ALICE_PUBKEY} --range 65535-131074 -n < $TESTFILE > $TESTFILES/message.abbbc.c4gh
 
     # Alice decrypts it
     export C4GH_PASSPHRASE=${ALICE_PASSPHRASE}
@@ -65,7 +65,7 @@ function teardown() {
     
     # Bob encrypts the testfile for himself
     export C4GH_PASSPHRASE=${BOB_PASSPHRASE}
-    crypt4gh encrypt --sk ${BOB_SECKEY} --recipient_pk ${BOB_PUBKEY} < $TESTFILE > $TESTFILES/message.bob.c4gh
+    crypt4gh encrypt --sk ${BOB_SECKEY} --recipient_pk ${BOB_PUBKEY} -n < $TESTFILE > $TESTFILES/message.bob.c4gh
 
     # Bob rearranges it
     export C4GH_PASSPHRASE=${BOB_PASSPHRASE}

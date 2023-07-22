@@ -29,14 +29,6 @@ CIPHER_SEGMENT_SIZE = SEGMENT_SIZE + CIPHER_DIFF
 # 2: AES-256-CTR => Not Implemented
 # else: NotSupported
 
-def bitwise_add_one(a):
-    b = 1
-    while b != 0:
-        carry = a & b  # Carry value is calculated
-        a = a ^ b      # Sum value is calculated and stored in a
-        b = carry << 1 # The carry value is shifted towards left by a bit
-    return a & 0xFFFFFFFF
-
 
 ##############################################################
 ##
@@ -163,18 +155,19 @@ def encrypt_aad(keys, infile, outfile):
     # Preparing the encryption engine
     encryption_method = 1 # with AEAD
     session_key = os.urandom(32) # we use one session key for all blocks
-    aad_seq = os.urandom(4)
+    aad_seq_bytes = os.urandom(4)
+    aad_seq = int.from_bytes(aad_seq_bytes, byteorder='little', signed=False) # no need to "& 0xFFFFFFFF"
 
     # Output the header
     LOG.debug('Creating Crypt4GH header')
     header_session_key_packets = header.encrypt(header.make_packet_data_enc(encryption_method, session_key),
                                                 keys)
-    header_sequence_number_packets = header.encrypt(header.make_packet_sequence_number(aad_seq),
+    header_sequence_number_packets = header.encrypt(header.make_packet_sequence_number(aad_seq_bytes),
                                                     keys)
     header_packets = chain(header_session_key_packets,header_sequence_number_packets)
     header_bytes = header.serialize(header_packets)
     
-    LOG.debug(f'sequence number: %s', header.sequence_number_to_binstr(aad_seq))
+    LOG.debug(f'sequence number: %s | %s', bin(aad_seq), aad_seq)
     LOG.debug('header length: %d', len(header_bytes))
     outfile.write(header_bytes)
 
@@ -187,23 +180,23 @@ def encrypt_aad(keys, infile, outfile):
     while True:
         segment_len = infile.readinto(segment)
 
-        LOG.debug('aad_seq: %s', header.sequence_number_to_binstr(aad_seq))
+        aad_seq_bytes = aad_seq.to_bytes(4, 'little')
 
         if segment_len == 0: # We end up on a segment boundary: we encrypt an extra empty (final) segment
-            _encrypt_segment(b'', outfile.write, session_key, aad=aad_seq)
+            _encrypt_segment(b'', outfile.write, session_key, aad=aad_seq_bytes)
             break
 
         if segment_len < SEGMENT_SIZE: # not a full segment
             data = bytes(segment[:segment_len]) # to discard the bytes from the previous segments
-            _encrypt_segment(data, outfile.write, session_key, aad=aad_seq)
+            _encrypt_segment(data, outfile.write, session_key, aad=aad_seq_bytes)
             break
 
         data = bytes(segment) # this is a full segment
-        _encrypt_segment(data, outfile.write, session_key, aad=aad_seq)
+        _encrypt_segment(data, outfile.write, session_key, aad=aad_seq_bytes)
 
         # update the sequence number
-        aad_seq = bitwise_add_one(aad_seq) # can and should wrap around
-        
+        aad_seq = (aad_seq + 1) & 0xFFFFFFFF # can and should wrap around
+
 
     LOG.info('Encryption Successful with AEAD')
 
@@ -440,16 +433,15 @@ def body_decrypt_aad(infile, session_keys, output, offset, aead_seq):
 
         # adjust the sequence number of the start segment
         for _ in range(start_segment): # todo: add the number directly instead of 1 by 1
-            aead_seq = bitwise_add_one(aead_seq)
+            aead_seq = (aead_seq + 1) & 0xFFFFFFFF
 
     # Decrypt all segments until the end
-    LOG.debug('aad: %s', header.sequence_number_to_binstr(aad))
+    LOG.debug('aad: %s | %s', bin(aead_seq), aead_seq)
     try:
         for ciphersegment in cipher_chunker(infile, CIPHER_SEGMENT_SIZE, with_aad=True): # error if missing last segment
-            segment = decrypt_block(ciphersegment, session_keys, aad=aead_seq)
+            segment = decrypt_block(ciphersegment, session_keys, aad=aead_seq.to_bytes(4, 'little'))
             output.send(segment)
-            aead_seq = bitwise_add_one(aead_seq)
-            LOG.debug('aad: %s', header.sequence_number_to_binstr(aead_seq))
+            aead_seq = (aead_seq + 1) & 0xFFFFFFFF
     except ProcessingOver:  # output raised it
         pass
 
@@ -484,7 +476,7 @@ def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
 
     if edit_list is None:
         # No edit list: decrypt all segments until the end
-        if aead_seq:
+        if aead_seq is not None: # with AEAD
             body_decrypt_aad(infile, session_keys, output, offset, aead_seq)
         else:
             body_decrypt(infile, session_keys, output, offset)

@@ -43,6 +43,9 @@ Options:
    -n, --no_aad           Disable AEAD (Authenticated Encryption with Associated Data)
    --range <start-end>    Byte-range either as <start-end> or just <start> (Start included, End excluded) [only if -n]
 
+Notes:
+   The "rearrange" command only works without AEAD
+
 Environment variables:
    C4GH_LOG         If defined, it will be used as the default logger
    C4GH_SECRET_KEY  If defined, it will be used as the default secret key (ie --sk ${{C4GH_SECRET_KEY}})
@@ -74,7 +77,7 @@ def parse_args(argv=sys.argv[1:]):
             logging.config.dictConfig(json.load(f))
 
     # Checking incompatible options
-    if not args['--no_aad'] and args['--range']:
+    if not args.get('rearrange') and not args['--no_aad'] and args['--range']:
         raise ValueError('--range must use --no_aad')
 
     # I prefer to clean up

@@ -95,12 +95,18 @@ def partition_packets(packets):
     enc_packets = []
     edits = None
     sequence_packet = None
+    found_encryption_method = None
 
     for packet in packets:
 
         packet_type = packet[:4]
 
         if packet_type == PACKET_TYPE_DATA_ENC: 
+            encryption_method = packet[4:8]
+            if found_encryption_method is None:
+                found_encryption_method = encryption_method
+            elif found_encryption_method != encryption_method:
+                raise ValueError('Data Encryption packets differ in encryption method')
             enc_packets.append(packet)
 
         elif packet_type == PACKET_TYPE_EDIT_LIST:
@@ -116,6 +122,9 @@ def partition_packets(packets):
         else: # Bark if unsupported packet. Don't just ignore it
             packet_type = int.from_bytes(packet_type, byteorder='little')
             raise ValueError(f'Invalid packet type {packet_type}')
+
+    if found_encryption_method == b'\x01\x00\x00\x00' and sequence_packet is None:
+        raise ValueError(f'Missing sequence number for encryption method "1"')
 
     return (enc_packets, edits, sequence_packet)
 

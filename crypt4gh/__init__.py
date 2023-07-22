@@ -31,13 +31,14 @@ cryptographic file format."""
 # - there is an Edit List: we reject the file if a cipher block is entirely skipped (independently of the <start-end> range).
 # (If edit list and range are both used: we decipher each block and then apply the range)
 #
+# In case we use AEAD mode (the default), we do not support range, nor edit lists
 #
 # Finally, we do not yet implement slicing a file that already contains an Edit List
 #
 
 
 __title__ = 'GA4GH cryptographic utilities'
-__version__ = '1.6' # VERSION in header is 1 (as 4 bytes little endian)
+__version__ = '2.0' # VERSION in header is still 1 (as 4 bytes little endian)
 __author__ = 'Frédéric Haziza'
 __author_email__ = 'frederic.haziza@crg.eu'
 __license__ = 'Apache License 2.0'

@@ -26,10 +26,10 @@ __doc__ = f'''
 Utility for the cryptographic GA4GH standard, reading from stdin and outputting to stdout.
 
 Usage:
-   {PROG} [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--range <start-end>]
+   {PROG} [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--range <start-end>] [--no_aad]
    {PROG} [-hv] [--log <file>] decrypt [--sk <path>] [--sender_pk <path>] [--range <start-end>]
-   {PROG} [-hv] [--log <file>] rearrange [--sk <path>] --range <start-end>
    {PROG} [-hv] [--log <file>] reencrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--trim]
+   {PROG} [-hv] [--log <file>] rearrange [--sk <path>] --range <start-end>
 
 Options:
    -h, --help             Prints this help and exit
@@ -39,9 +39,9 @@ Options:
                           When encrypting, if neither the private key nor C4GH_SECRET_KEY are specified, we generate a new key 
    --recipient_pk <path>  Recipient's Curve25519-based Public key
    --sender_pk <path>     Peer's Curve25519-based Public key to verify provenance (akin to signature)
-   --range <start-end>    Byte-range either as  <start-end> or just <start> (Start included, End excluded)
    -t, --trim             Keep only header packets that you can decrypt
-
+   -n, --no_aad           Disable AEAD (Authenticated Encryption with Associated Data)
+   --range <start-end>    Byte-range either as <start-end> or just <start> (Start included, End excluded) [only if -n]
 
 Environment variables:
    C4GH_LOG         If defined, it will be used as the default logger
@@ -69,15 +69,18 @@ def parse_args(argv=sys.argv[1:]):
                         level=logging.DEBUG if C4GH_DEBUG else logging.CRITICAL,
                         format='[%(levelname)s] %(message)s')
     if logger and os.path.exists(logger):
-        with open(logger, 'rt') as stream:
-            import yaml
-            logging.config.dictConfig(yaml.safe_load(stream))
+        with open(logger, 'rt') as f:
+            import json
+            logging.config.dictConfig(json.load(f))
+
+    # Checking incompatible options
+    if not args['--no_aad'] and args['--range']:
+        raise ValueError('--range must use --no_aad')
 
     # I prefer to clean up
     for s in ['--log', '--help', '--version']:#, 'help', 'version']:
         del args[s]
 
-    # print(args)
     return args
 
 
@@ -146,11 +149,16 @@ def encrypt(args):
     if not recipient_keys:
         raise ValueError("No Recipients' Public Key found")
 
-    lib.encrypt(recipient_keys,
-                sys.stdin.buffer,
-                sys.stdout.buffer,
-                offset = range_start,
-                span = range_span)
+    if args['--no_aad']: # without AEAD
+        lib.encrypt(recipient_keys,
+                    sys.stdin.buffer,
+                    sys.stdout.buffer,
+                    offset = range_start,
+                    span = range_span)
+    else: # with AEAD
+        lib.encrypt_aad(recipient_keys,
+                        sys.stdin.buffer,
+                        sys.stdout.buffer)
     
 
 def decrypt(args):

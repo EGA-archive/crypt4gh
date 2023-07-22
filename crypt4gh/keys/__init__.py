@@ -143,9 +143,9 @@ def run(argv=sys.argv[1:]):
     # Logging
     logger = args['--log'] or DEFAULT_LOG
     if logger and os.path.exists(logger):
-        with open(logger, 'rt') as stream:
-            import yaml
-            logging.config.dictConfig(yaml.safe_load(stream))
+        with open(logger, 'rt') as f:
+            import json
+            logging.config.dictConfig(json.load(f))
 
     # I prefer to clean up
     for s in ['--log', '--help', '--version']:#, 'help', 'version']:

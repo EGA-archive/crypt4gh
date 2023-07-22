@@ -5,6 +5,7 @@ import os
 import logging
 import io
 import collections
+from itertools import chain
 
 from nacl.bindings import (crypto_aead_chacha20poly1305_ietf_encrypt,
                            crypto_aead_chacha20poly1305_ietf_decrypt)
@@ -24,8 +25,17 @@ CIPHER_SEGMENT_SIZE = SEGMENT_SIZE + CIPHER_DIFF
 # ------------------------------
 #
 # 0: chacha20_ietf_poly1305
-# 1: AES-256-CTR => Not Implemented
+# 1: chacha20_ietf_poly1305 with AEAD
+# 2: AES-256-CTR => Not Implemented
 # else: NotSupported
+
+def bitwise_add_one(a):
+    b = 1
+    while b != 0:
+        carry = a & b  # Carry value is calculated
+        a = a ^ b      # Sum value is calculated and stored in a
+        b = carry << 1 # The carry value is shifted towards left by a bit
+    return a & 0xFFFFFFFF
 
 
 ##############################################################
@@ -34,13 +44,13 @@ CIPHER_SEGMENT_SIZE = SEGMENT_SIZE + CIPHER_DIFF
 ##
 ##############################################################
 
-def _encrypt_segment(data, process, key):
+def _encrypt_segment(data, process, key, aad=None):
     '''Utility function to generate a nonce, encrypt data with Chacha20, and authenticate it with Poly1305.'''
 
     #LOG.debug("Segment [%d bytes]: %s..%s", len(data), data[:10], data[-10:])
 
     nonce = os.urandom(12)
-    encrypted_data = crypto_aead_chacha20poly1305_ietf_encrypt(data, None, nonce, key)  # no add
+    encrypted_data = crypto_aead_chacha20poly1305_ietf_encrypt(data, aad, nonce, key)
     process(nonce) # after producing the segment, so we don't start outputing when an error occurs
     process(encrypted_data)
 
@@ -139,8 +149,63 @@ def encrypt(keys, infile, outfile, offset=0, span=None):
             if segment_len < SEGMENT_SIZE: # not a full segment
                 break
 
-    LOG.info('Encryption Successful')
+    LOG.info('Encryption Successful without AEAD')
 
+@close_on_broken_pipe
+def encrypt_aad(keys, infile, outfile):
+    '''Encrypt infile into outfile, using the list of keys.
+
+    This produces a Crypt4GH file with AEAD (and without edit list).
+    '''
+
+    LOG.info('Encrypting the file with AEAD')
+
+    # Preparing the encryption engine
+    encryption_method = 1 # with AEAD
+    session_key = os.urandom(32) # we use one session key for all blocks
+    aad_seq = os.urandom(4)
+
+    # Output the header
+    LOG.debug('Creating Crypt4GH header')
+    header_session_key_packets = header.encrypt(header.make_packet_data_enc(encryption_method, session_key),
+                                                keys)
+    header_sequence_number_packets = header.encrypt(header.make_packet_sequence_number(aad_seq),
+                                                    keys)
+    header_packets = chain(header_session_key_packets,header_sequence_number_packets)
+    header_bytes = header.serialize(header_packets)
+    
+    LOG.debug(f'sequence number: %s', header.sequence_number_to_binstr(aad_seq))
+    LOG.debug('header length: %d', len(header_bytes))
+    outfile.write(header_bytes)
+
+    # ...and cue music
+    LOG.debug("Streaming content")
+    # oh boy... I buffer a whole segment!
+    # TODO: Use a smaller buffer (Requires code rewrite)
+    segment = bytearray(SEGMENT_SIZE)
+    
+    while True:
+        segment_len = infile.readinto(segment)
+
+        LOG.debug('aad_seq: %s', header.sequence_number_to_binstr(aad_seq))
+
+        if segment_len == 0: # We end up on a segment boundary: we encrypt an extra empty (final) segment
+            _encrypt_segment(b'', outfile.write, session_key, aad=aad_seq)
+            break
+
+        if segment_len < SEGMENT_SIZE: # not a full segment
+            data = bytes(segment[:segment_len]) # to discard the bytes from the previous segments
+            _encrypt_segment(data, outfile.write, session_key, aad=aad_seq)
+            break
+
+        data = bytes(segment) # this is a full segment
+        _encrypt_segment(data, outfile.write, session_key, aad=aad_seq)
+
+        # update the sequence number
+        aad_seq = bitwise_add_one(aad_seq) # can and should wrap around
+        
+
+    LOG.info('Encryption Successful with AEAD')
 
 ##############################################################
 ##
@@ -157,7 +222,7 @@ def cipher_chunker(f, size):
         assert( ciphersegment_len > CIPHER_DIFF )
         yield ciphersegment
 
-def decrypt_block(ciphersegment, session_keys):
+def decrypt_block(ciphersegment, session_keys, aad=None):
     # Trying the different session keys (via the cipher objects)
     # Note: we could order them and if one fails, we move it at the end of the list
     # So... LRU solution. For now, try them as they come.
@@ -166,7 +231,7 @@ def decrypt_block(ciphersegment, session_keys):
 
     for key in session_keys:
         try:
-            return crypto_aead_chacha20poly1305_ietf_decrypt(data, None, nonce, key)  # no add, and break the loop
+            return crypto_aead_chacha20poly1305_ietf_decrypt(data, aad, nonce, key)  # break the loop on success
         except CryptoError as tag:
             LOG.error('Decryption failed: %s', tag)
     else: # no cipher worked: Bark!
@@ -355,6 +420,31 @@ def body_decrypt_parts(infile, session_keys, output, edit_list=None):
         pass
 
 
+def body_decrypt_aad(infile, session_keys, output, offset, aead_seq):
+
+    # In this case, we try to fast-forward, and adjust the offset
+    if offset >= SEGMENT_SIZE: 
+        start_segment, offset = divmod(offset, SEGMENT_SIZE)
+        LOG.warning('Fast-forwarding %d segments', start_segment)
+        start_ciphersegment = start_segment * CIPHER_SEGMENT_SIZE
+        infile.seek(start_ciphersegment, io.SEEK_CUR)  # move forward
+
+        # adjust the sequence number of the start segment
+        for _ in range(start_segment): # todo: add the number directly instead of 1 by 1
+            aead_seq = bitwise_add_one(aead_seq)
+
+    # Decrypt all segments until the end
+    LOG.debug('aad: %s', header.sequence_number_to_binstr(aad))
+    try:
+        for ciphersegment in cipher_chunker(infile, CIPHER_SEGMENT_SIZE):
+            segment = decrypt_block(ciphersegment, session_keys, aad=aead_seq)
+            output.send(segment)
+            aead_seq = bitwise_add_one(aead_seq)
+            LOG.debug('aad: %s', header.sequence_number_to_binstr(aead_seq))
+    except ProcessingOver:  # output raised it
+        pass
+
+
 @close_on_broken_pipe
 def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
     '''Decrypt infile into outfile, using a given set of keys.
@@ -375,7 +465,7 @@ def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
         )
     )
 
-    session_keys, edit_list = header.deconstruct(infile, keys, sender_pubkey=sender_pubkey)
+    session_keys, edit_list, aead_seq = header.deconstruct(infile, keys, sender_pubkey=sender_pubkey)
 
     # Infile in now positioned at the beginning of the data portion
 
@@ -385,7 +475,10 @@ def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
 
     if edit_list is None:
         # No edit list: decrypt all segments until the end
-        body_decrypt(infile, session_keys, output, offset)
+        if aead_seq:
+            body_decrypt_aad(infile, session_keys, output, offset, aead_seq)
+        else:
+            body_decrypt(infile, session_keys, output, offset)
         # We could use body_decrypt_parts but there is an inner buffer, and segments might not be aligned
     else:
         # Edit list: it drives which segments is decrypted

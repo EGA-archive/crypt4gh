@@ -52,7 +52,6 @@ Table of Contents
    Encryption           <encryption>
    Key Format           <keys>
    Usage & Examples     <usage>
-   Python Modules       <code>
 
 
 |Travis| | Version |version| | Generated |today|

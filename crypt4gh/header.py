@@ -114,16 +114,16 @@ def partition_packets(packets):
             packet_type = int.from_bytes(packet_type, byteorder='little')
             raise ValueError(f'Invalid packet type {packet_type}')
 
-    return (enc_packets, edits, sequence_packet)
+    return enc_packets, edits
 
 # -------------------------------------
 # Encrypted data packet
 # -------------------------------------
 def make_packet_data_enc(encryption_method, *params):
-    LOG.debug('------ SESSION KEY: %s', session_key.hex())
+    LOG.debug('------ Data enc params: %s', [p.hex() for p in params])
     return (PACKET_TYPE_DATA_ENC
             + encryption_method.to_bytes(4,'little') 
-            + ''.join(params)) # session key, sequence number, ...
+            + b''.join(params)) # session key, sequence number, ...
 
 def parse_enc_packet(packet):
     assert( packet[:4] == PACKET_TYPE_DATA_ENC )

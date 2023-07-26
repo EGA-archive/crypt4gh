@@ -236,7 +236,7 @@ def decrypt_block(ciphersegment, idx, data_enc_params):
             aad = None
         elif method == 1:
             key, seq_num = params
-            aad = ((seq_num + idx) & OxFFFFFFFFFFFFFFFF).to_bytes(8, 'little')
+            aad = ((seq_num + idx) & 0xFFFFFFFFFFFFFFFF).to_bytes(8, 'little')
         else: 
             continue # not happening
         try:
@@ -302,9 +302,12 @@ def body_decrypt(infile, data_enc_params, output, segment_idx):
         LOG.warning('Fast-forwarding %d segments', segment_idx)
         start_cipher_pos = segment_idx * CIPHER_SEGMENT_SIZE
         infile.seek(start_cipher_pos, io.SEEK_CUR)  # move forward
-
-    check_trailing_segment = filter(lambda (method, *args): True if method == 1 else False,
-                      data_enc_params)
+        
+    check_trailing_segment = False
+    for method, *params in data_enc_params:
+        if method == 1:
+            check_trailing_segment = True
+            break
 
     try:
         chunks_gen = cipher_chunker(infile, CIPHER_SEGMENT_SIZE,
@@ -317,9 +320,9 @@ def body_decrypt(infile, data_enc_params, output, segment_idx):
 
 
 class DecryptedBuffer():
-    def __init__(self, fileobj, session_keys, output):
+    def __init__(self, fileobj, data_enc_params, output):
         self.fileobj = fileobj
-        self.session_keys = session_keys
+        self.data_enc_params = data_enc_params
         self.buf = io.BytesIO()
         self.block = 0  # just used for printing, if that block is entirely skipped
         self.output = output
@@ -357,7 +360,7 @@ class DecryptedBuffer():
         # else, we decrypt
         LOG.debug('Decrypting block %d', self.block)
         assert( len(data) > CIPHER_DIFF )
-        segment = decrypt_block(data, self.session_keys)
+        segment = decrypt_block(data, self.block, self.data_enc_params)
         LOG.debug('Adding %d bytes to the buffer', len(segment))
         self._append_to_buf(segment)
         LOG.debug('Buffer size: %d', self.buf_size())
@@ -401,7 +404,7 @@ class DecryptedBuffer():
             size -= len(b2)
 
 
-def body_decrypt_parts(infile, session_keys, output, edit_list=None):
+def body_decrypt_parts(infile, data_enc_params, output, edit_list=None):
     """Decrypt the data portion according to the edit list.
 
     We do not decrypt segments that are entirely skipped, and only output a warning (that it should not be the case).
@@ -411,7 +414,7 @@ def body_decrypt_parts(infile, session_keys, output, edit_list=None):
     LOG.debug('Edit List: %s', edit_list)
     assert(len(edit_list) > 0), "You can not call this function without an edit_list"
 
-    decrypted = DecryptedBuffer(infile, session_keys, output)
+    decrypted = DecryptedBuffer(infile, data_enc_params, output)
 
     try:
 
@@ -472,7 +475,7 @@ def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
         output = limited_output(offset=offset, limit=span, process=outfile.write)
         next(output) # start it
         # Edit list: it drives which segments is decrypted
-        body_decrypt_parts(infile, session_keys, output, edit_list=list(edit_list))
+        body_decrypt_parts(infile, data_enc_params, output, edit_list=list(edit_list))
 
     LOG.info('Decryption Over')
 

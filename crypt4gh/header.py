@@ -3,8 +3,6 @@
 
 import os
 import logging
-from itertools import chain
-# from types import GeneratorType
 
 from nacl.bindings import (crypto_kx_client_session_keys,
                            crypto_kx_server_session_keys,
@@ -88,14 +86,12 @@ def serialize(packets):
 
 PACKET_TYPE_DATA_ENC = b'\x00\x00\x00\x00'  # 0 little endian
 PACKET_TYPE_EDIT_LIST = b'\x01\x00\x00\x00' # 1 little endian
-PACKET_TYPE_SEQUENCE_NUMBER = b'\x02\x00\x00\x00' # 2 little endian
 
 def partition_packets(packets):
 
     enc_packets = []
     edits = None
-    sequence_packet = None
-    found_encryption_method = None
+    last_encryption_method = None
 
     for packet in packets:
 
@@ -103,10 +99,10 @@ def partition_packets(packets):
 
         if packet_type == PACKET_TYPE_DATA_ENC: 
             encryption_method = packet[4:8]
-            if found_encryption_method is None:
-                found_encryption_method = encryption_method
-            elif found_encryption_method != encryption_method:
-                raise ValueError('Data Encryption packets differ in encryption method')
+            if last_encryption_method is None:
+                last_encryption_method = encryption_method
+            elif last_encryption_method != encryption_method:
+                raise ValueError('Data Encryption methods can not be mixed')
             enc_packets.append(packet)
 
         elif packet_type == PACKET_TYPE_EDIT_LIST:
@@ -114,38 +110,36 @@ def partition_packets(packets):
                 raise ValueError('Invalid file: Too many edit list packets')
             edits = packet
 
-        elif packet_type == PACKET_TYPE_SEQUENCE_NUMBER:
-            if sequence_packet is not None: # reject files if many AEAD sequence packets
-                raise ValueError('Invalid file: Too many AEAD sequence packets')
-            sequence_packet = packet # or packet[:] copy?
-
         else: # Bark if unsupported packet. Don't just ignore it
             packet_type = int.from_bytes(packet_type, byteorder='little')
             raise ValueError(f'Invalid packet type {packet_type}')
-
-    if found_encryption_method == b'\x01\x00\x00\x00' and sequence_packet is None:
-        raise ValueError(f'Missing sequence number for encryption method "1"')
 
     return (enc_packets, edits, sequence_packet)
 
 # -------------------------------------
 # Encrypted data packet
 # -------------------------------------
-def make_packet_data_enc(encryption_method, session_key):
+def make_packet_data_enc(encryption_method, *params):
     LOG.debug('------ SESSION KEY: %s', session_key.hex())
     return (PACKET_TYPE_DATA_ENC
             + encryption_method.to_bytes(4,'little') 
-            + session_key)
+            + ''.join(params)) # session key, sequence number, ...
 
 def parse_enc_packet(packet):
     assert( packet[:4] == PACKET_TYPE_DATA_ENC )
     # if encryption_method != 0:
     encryption_method = packet[4:8]
-    if encryption_method in (b'\x00\x00\x00\x00', # 0 little endian
-                             b'\x01\x00\x00\x00' # 1 little endian
-                             ): 
+    if encryption_method == b'\x00\x00\x00\x00': # 0 little endian: chacha-no-AEAD
+        assert len(packet) == (4 + 4 + 32)
         LOG.debug('------ SESSION KEY: %s', packet[8:].hex())
-        return packet[8:]
+        return 0, packet[8:]
+
+    if encryption_method == b'\x01\x00\x00\x00': # 1 little endian : chacha-with-AEAD
+        assert len(packet) == (4 + 4 + 32 + 8)
+        LOG.debug('------ SESSION KEY: %s', packet[8:40].hex())
+        seq_num = int.from_bytes(packet[40:48], byteorder='little', signed=False) # no need to "& 0xFFFFFFFFFFFFFFFF"
+        LOG.debug('------ SEQ NUM: %s', seq_num)
+        return 1, packet[8:40], seq_num
 
     LOG.warning('Unsupported bulk encryption method: %s', encryption_method)
     encryption_method = int.from_bytes(encryption_method, byteorder='little')
@@ -184,26 +178,10 @@ def parse_edit_list_packet(packet):
     return (int.from_bytes(packet[i+4:i+12], byteorder='little') for i in range(4, nb_lengths * 8, 8)) # generator
 
 # -------------------------------------
-# AEAD sequence packet
-# -------------------------------------
-def make_packet_sequence_number(sequence_number: bytes):
-    assert (len(sequence_number) == 4)
-    return (PACKET_TYPE_SEQUENCE_NUMBER
-            + sequence_number) # don't bother about endianness
-
-def parse_sequence_number_packet(packet):
-    '''Returns the sequence number for the AEAD encrypted'''
-    assert( packet[:4] == PACKET_TYPE_SEQUENCE_NUMBER )
-    assert( len(packet) == 8 )
-    return int.from_bytes(packet[4:8], byteorder='little', signed=False)
-
-# -------------------------------------
 # Header Encryption Methods Conventions
 # -------------------------------------
 #
 # 0: chacha20_ietf_poly1305
-# 1: chacha20_ietf_poly1305 with AEAD
-# 2: AES-256-GCM ?
 # else: NotImplemented / NotSupported
 
 def encrypt_X25519_Chacha20_Poly1305(data, seckey, recipient_pubkey):
@@ -353,12 +331,11 @@ def deconstruct(infile, keys, sender_pubkey=None):
     if not packets: # no packets were decrypted
         raise ValueError('No supported encryption method')
 
-    data_packets, edit_packet, aead_packet = partition_packets(packets)
+    data_packets, edit_packet = partition_packets(packets)
     # Parse returns the session key (since it should be method 0) 
-    session_keys = [parse_enc_packet(packet) for packet in data_packets]
+    data_enc_params = [parse_enc_packet(packet) for packet in data_packets]
     edit_list = parse_edit_list_packet(edit_packet) if edit_packet else None
-    aead_seq = parse_sequence_number_packet(aead_packet) if aead_packet else None
-    return session_keys, edit_list, aead_seq
+    return data_enc_params, edit_list
 
 # -------------------------------------
 # Header Re-Encryption
@@ -415,10 +392,9 @@ def rearrange(header_packets, keys, offset=0, span=None, sender_pubkey=None):
     if not decrypted_packets:
         raise ValueError('No header packet could be decrypted')
 
-    data_packets, edit_packet, aead_packet = partition_packets(decrypted_packets)
+    data_packets, edit_packet = partition_packets(decrypted_packets)
 
-    if aead_packet:
-        raise ValueError('Not compatible with AEAD method')
+    # TODO: Check if data_packets use only method 0 (ie no AEAD)
 
     #
     # Note: We do not yet implement chunking a file that already contains an Edit List

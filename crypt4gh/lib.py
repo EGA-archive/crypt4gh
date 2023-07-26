@@ -6,6 +6,7 @@ import logging
 import io
 import collections
 from itertools import chain
+import resource
 
 from nacl.bindings import (crypto_aead_chacha20poly1305_ietf_encrypt,
                            crypto_aead_chacha20poly1305_ietf_decrypt)
@@ -155,16 +156,13 @@ def encrypt_aad(keys, infile, outfile):
     # Preparing the encryption engine
     encryption_method = 1 # with AEAD
     session_key = os.urandom(32) # we use one session key for all blocks
-    aad_seq_bytes = os.urandom(4)
-    aad_seq = int.from_bytes(aad_seq_bytes, byteorder='little', signed=False) # no need to "& 0xFFFFFFFF"
+    aad_seq_bytes = os.urandom(8)
+    aad_seq = int.from_bytes(aad_seq_bytes, byteorder='little', signed=False) # no need to "& 0xFFFFFFFFFFFFFFFF"
 
     # Output the header
     LOG.debug('Creating Crypt4GH header')
-    header_session_key_packets = header.encrypt(header.make_packet_data_enc(encryption_method, session_key),
-                                                keys)
-    header_sequence_number_packets = header.encrypt(header.make_packet_sequence_number(aad_seq_bytes),
-                                                    keys)
-    header_packets = chain(header_session_key_packets,header_sequence_number_packets)
+    header_packets = header.encrypt(header.make_packet_data_enc(encryption_method, session_key, aad_seq_bytes),
+                                    keys)
     header_bytes = header.serialize(header_packets)
     
     LOG.debug(f'sequence number: %s | %s', bin(aad_seq), aad_seq)
@@ -176,11 +174,13 @@ def encrypt_aad(keys, infile, outfile):
     # oh boy... I buffer a whole segment!
     # TODO: Use a smaller buffer (Requires code rewrite)
     segment = bytearray(SEGMENT_SIZE)
+    segment_idx = 0
     
     while True:
         segment_len = infile.readinto(segment)
 
-        aad_seq_bytes = aad_seq.to_bytes(4, 'little')
+        _aad = (aad_seq + segment_idx) & 0xFFFFFFFFFFFFFFFF # can and should wrap around
+        aad_seq_bytes = _aad.to_bytes(8, 'little')
 
         if segment_len == 0: # We end up on a segment boundary: we encrypt an extra empty (final) segment
             _encrypt_segment(b'', outfile.write, session_key, aad=aad_seq_bytes)
@@ -194,8 +194,7 @@ def encrypt_aad(keys, infile, outfile):
         data = bytes(segment) # this is a full segment
         _encrypt_segment(data, outfile.write, session_key, aad=aad_seq_bytes)
 
-        # update the sequence number
-        aad_seq = (aad_seq + 1) & 0xFFFFFFFF # can and should wrap around
+        segment_idx += 1
 
 
     LOG.info('Encryption Successful with AEAD')
@@ -206,32 +205,40 @@ def encrypt_aad(keys, infile, outfile):
 ##
 ##############################################################
 
-def cipher_chunker(f, size, with_aad=False):
+def cipher_chunker(f, size, check_trailing_segment=False):
     trailing_segment = False
     while True:
         ciphersegment = f.read(size)
         ciphersegment_len = len(ciphersegment)
-        if ciphersegment_len == 0: 
-            if with_aad and not trailing_segment:
+        if ciphersegment_len == 0: # no more data
+            if check_trailing_segment and not trailing_segment:
                 raise ValueError('Missing trailing segment')
             break # We were at the last segment. Exits the loop
-        if with_aad and ciphersegment_len == CIPHER_DIFF: 
-            # We were at the last empty segment. Only check if the final AEAD segment is correct
-            trailing_segment = True
         else:
-            assert( ciphersegment_len > CIPHER_DIFF )
-            if with_aad and ciphersegment_len < CIPHER_SEGMENT_SIZE:
+            assert ((not check_trailing_segment and ciphersegment_len > CIPHER_DIFF)
+                    or
+                    (check_trailing_segment and ciphersegment_len >= CIPHER_DIFF)
+                    )
+            if check_trailing_segment and ciphersegment_len < CIPHER_SEGMENT_SIZE: # works for ciphersegment_len == CIPHER_DIFF
                 trailing_segment = True
         yield ciphersegment
 
-def decrypt_block(ciphersegment, session_keys, aad=None):
+def decrypt_block(ciphersegment, idx, data_enc_params):
     # Trying the different session keys (via the cipher objects)
     # Note: we could order them and if one fails, we move it at the end of the list
     # So... LRU solution. For now, try them as they come.
     nonce = ciphersegment[:12]
     data = ciphersegment[12:]
 
-    for key in session_keys:
+    for method, *params in data_enc_params:
+        if method == 0:
+            key = params[0]
+            aad = None
+        elif method == 1:
+            key, seq_num = params
+            aad = ((seq_num + idx) & OxFFFFFFFFFFFFFFFF).to_bytes(8, 'little')
+        else: 
+            continue # not happening
         try:
             return crypto_aead_chacha20poly1305_ietf_decrypt(data, aad, nonce, key)  # break the loop on success
         except CryptoError as tag:
@@ -282,24 +289,28 @@ def limited_output(offset=0, limit=None, process=None):
         offset = 0 # reset offset
 
 
-def body_decrypt(infile, session_keys, output, offset):
+def body_decrypt(infile, data_enc_params, output, segment_idx):
     """Decrypt the whole data portion.
 
-    We fast-forward if offset >= SEGMENT_SIZE.
+    We fast-forward if segment_idx > 0.
     We decrypt until the first one occurs:
     * `output` reaches its end
     * `infile` reaches its end."""
 
     # In this case, we try to fast-forward, and adjust the offset
-    if offset >= SEGMENT_SIZE: 
-        start_segment, offset = divmod(offset, SEGMENT_SIZE)
-        LOG.warning('Fast-forwarding %d segments', start_segment)
-        start_ciphersegment = start_segment * CIPHER_SEGMENT_SIZE
-        infile.seek(start_ciphersegment, io.SEEK_CUR)  # move forward
+    if segment_idx: 
+        LOG.warning('Fast-forwarding %d segments', segment_idx)
+        start_cipher_pos = segment_idx * CIPHER_SEGMENT_SIZE
+        infile.seek(start_cipher_pos, io.SEEK_CUR)  # move forward
+
+    check_trailing_segment = filter(lambda (method, *args): True if method == 1 else False,
+                      data_enc_params)
 
     try:
-        for ciphersegment in cipher_chunker(infile, CIPHER_SEGMENT_SIZE):
-            segment = decrypt_block(ciphersegment, session_keys)
+        chunks_gen = cipher_chunker(infile, CIPHER_SEGMENT_SIZE,
+                                    check_trailing_segment=check_trailing_segment)
+        for idx, ciphersegment in enumerate(chunks_gen,start=segment_idx):
+            segment = decrypt_block(ciphersegment, idx, data_enc_params)
             output.send(segment)
     except ProcessingOver:  # output raised it
         pass
@@ -422,28 +433,6 @@ def body_decrypt_parts(infile, session_keys, output, edit_list=None):
         pass
 
 
-def body_decrypt_aad(infile, session_keys, output, offset, aead_seq):
-
-    # In this case, we try to fast-forward, and adjust the offset
-    if offset >= SEGMENT_SIZE: 
-        start_segment, offset = divmod(offset, SEGMENT_SIZE)
-        LOG.warning('Fast-forwarding %d segments', start_segment)
-        start_ciphersegment = start_segment * CIPHER_SEGMENT_SIZE
-        infile.seek(start_ciphersegment, io.SEEK_CUR)  # move forward
-
-        # adjust the sequence number of the start segment
-        for _ in range(start_segment): # todo: add the number directly instead of 1 by 1
-            aead_seq = (aead_seq + 1) & 0xFFFFFFFF
-
-    # Decrypt all segments until the end
-    LOG.debug('aad: %s | %s', bin(aead_seq), aead_seq)
-    try:
-        for ciphersegment in cipher_chunker(infile, CIPHER_SEGMENT_SIZE, with_aad=True): # error if missing last segment
-            segment = decrypt_block(ciphersegment, session_keys, aad=aead_seq.to_bytes(4, 'little'))
-            output.send(segment)
-            aead_seq = (aead_seq + 1) & 0xFFFFFFFF
-    except ProcessingOver:  # output raised it
-        pass
 
 
 @close_on_broken_pipe
@@ -466,22 +455,22 @@ def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
         )
     )
 
-    session_keys, edit_list, aead_seq = header.deconstruct(infile, keys, sender_pubkey=sender_pubkey)
-
+    data_enc_params, edit_list = header.deconstruct(infile, keys, sender_pubkey=sender_pubkey)
     # Infile in now positioned at the beginning of the data portion
 
-    # Generator to slice the output
-    output = limited_output(offset=offset, limit=span, process=outfile.write)
-    next(output) # start it
-
     if edit_list is None:
+        # We jump with body_decrypt to the offset
+        start_segment, start_offset = divmod(offset, SEGMENT_SIZE)
+        # Generator to slice the output
+        output = limited_output(offset=start_offset, limit=span, process=outfile.write)
+        next(output) # start it
         # No edit list: decrypt all segments until the end
-        if aead_seq is not None: # with AEAD
-            body_decrypt_aad(infile, session_keys, output, offset, aead_seq)
-        else:
-            body_decrypt(infile, session_keys, output, offset)
+        body_decrypt(infile, data_enc_params, output, start_segment)
         # We could use body_decrypt_parts but there is an inner buffer, and segments might not be aligned
     else:
+        # Generator to slice the output
+        output = limited_output(offset=offset, limit=span, process=outfile.write)
+        next(output) # start it
         # Edit list: it drives which segments is decrypted
         body_decrypt_parts(infile, session_keys, output, edit_list=list(edit_list))
 
@@ -496,7 +485,7 @@ def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
 
 
 @close_on_broken_pipe
-def reencrypt(keys, recipient_keys, infile, outfile, chunk_size=4096, trim=False):
+def reencrypt(keys, recipient_keys, infile, outfile, chunk_size=resource.getpagesize(), trim=False):
     '''Extract header packets from infile and generate another one to outfile.
     The encrypted data section is only copied from infile to outfile.'''
 
@@ -541,9 +530,8 @@ def rearrange(keys, infile, outfile, offset=0, span=None):
 
     # Stream the remainder
     LOG.info('Streaming the remainder of the file')
-    chunk_size = SEGMENT_SIZE + CIPHER_DIFF # chunk = cipher segment
     while True:
-        segment = infile.read(chunk_size)
+        segment = infile.read(CIPHER_SEGMENT_SIZE)
         if not segment:
             break
         keep_segment = next(segment_oracle)

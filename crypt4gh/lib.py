@@ -289,7 +289,7 @@ class DecryptedBuffer():
         if not size:
             return
 
-       assert(size > 0)
+        assert(size > 0)
         LOG.debug('Skipping %d bytes | Buffer size: %d', size, self.buf_size())
 
         while size > 0:

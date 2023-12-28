@@ -286,7 +286,10 @@ class DecryptedBuffer():
         
     def skip(self, size):
         """Skip size bytes."""
-        assert(size > 0)
+        if not size:
+            return
+
+       assert(size > 0)
         LOG.debug('Skipping %d bytes | Buffer size: %d', size, self.buf_size())
 
         while size > 0:

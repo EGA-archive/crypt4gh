@@ -26,7 +26,7 @@ __doc__ = f'''
 Utility for the cryptographic GA4GH standard, reading from stdin and outputting to stdout.
 
 Usage:
-   {PROG} [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--range <start-end>]
+   {PROG} [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--range <start-end>] [--header <path>]
    {PROG} [-hv] [--log <file>] decrypt [--sk <path>] [--sender_pk <path>] [--range <start-end>]
    {PROG} [-hv] [--log <file>] rearrange [--sk <path>] --range <start-end>
    {PROG} [-hv] [--log <file>] reencrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--trim]
@@ -41,6 +41,7 @@ Options:
    --sender_pk <path>     Peer's Curve25519-based Public key to verify provenance (akin to signature)
    --range <start-end>    Byte-range either as  <start-end> or just <start> (Start included, End excluded)
    -t, --trim             Keep only header packets that you can decrypt
+   --header <path>        Where to write the header (default: stdout)
 
 
 Environment variables:
@@ -146,11 +147,20 @@ def encrypt(args):
     if not recipient_keys:
         raise ValueError("No Recipients' Public Key found")
 
-    lib.encrypt(recipient_keys,
-                sys.stdin.buffer,
-                sys.stdout.buffer,
-                offset = range_start,
-                span = range_span)
+    header = args["--header"]
+
+    try:
+        if header:
+            header = open(header, 'wb')
+        lib.encrypt(recipient_keys,
+                    sys.stdin.buffer,
+                    sys.stdout.buffer,
+                    header= header,
+                    offset = range_start,
+                    span = range_span)
+    finally:
+        if header:
+            header.close()
     
 
 def decrypt(args):

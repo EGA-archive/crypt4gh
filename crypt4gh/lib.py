@@ -46,7 +46,7 @@ def _encrypt_segment(data, process, key):
 
 
 @close_on_broken_pipe
-def encrypt(keys, infile, outfile, offset=0, span=None):
+def encrypt(keys, infile, outfile, header_stream=None, offset=0, span=None):
     '''Encrypt infile into outfile, using the list of keys.
 
 
@@ -57,6 +57,8 @@ def encrypt(keys, infile, outfile, offset=0, span=None):
     '''
 
     LOG.info('Encrypting the file')
+
+    header_stream = header_stream or outfile
 
     # Forward to start position
     LOG.debug("  Start Coordinate: %s", offset)
@@ -91,7 +93,7 @@ def encrypt(keys, infile, outfile, offset=0, span=None):
     header_bytes = header.serialize(header_packets)
 
     LOG.debug('header length: %d', len(header_bytes))
-    outfile.write(header_bytes)
+    header_stream.write(header_bytes)
 
     # ...and cue music
     LOG.debug("Streaming content")

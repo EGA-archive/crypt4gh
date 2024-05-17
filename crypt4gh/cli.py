@@ -151,11 +151,11 @@ def encrypt(args):
 
     try:
         if header:
-            header = open(header, 'wb')
+            header = open(header, 'wb') # let it raise exception
         lib.encrypt(recipient_keys,
                     sys.stdin.buffer,
                     sys.stdout.buffer,
-                    header= header,
+                    headerfile = header,
                     offset = range_start,
                     span = range_span)
     finally:

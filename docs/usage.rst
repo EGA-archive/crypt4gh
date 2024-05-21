@@ -64,3 +64,27 @@ Any user can generate a keypair with:
     $ crypt4gh-keygen --sk user.sec --pk user.pub
 
 The private key will be encrypted with a passphrase. The user is prompted at the terminal for that passphrase.
+
+Storing the encrypted header separately
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The encrypted header can be stored separately from the encrypted data. This is useful, for example, when sharing the encrypted message with many recipients. In this case, only the header needs to be re-encrypted (for a specific recipient) while the encrypted data can stay the same.
+
+To store the encrypted header in a separate file ``header.dat``, use the flag ``--header``:
+
+.. code-block:: console
+
+    $ crypt4gh encrypt --sk alice.sec --recipient_pk bob.pub --header header.bob.c4gh < M > M.data.c4gh
+
+Bob can then decrypt the message by concatenating the header and the data, and decrypting the whole file:
+
+.. code-block:: console
+
+    $ cat header.bob.c4gh M.data.c4gh > M.c4gh
+    $ crypt4gh decrypt --sk bob.sec < M.c4gh > M
+
+To re-encrypt the message for another user Eve, with public key ``eve.pub``, Alice can run the ``crypt4gh reencrypt`` command: 
+
+.. code-block:: console
+
+    $ crypt4gh reencrypt --sk alice.sec --recipient_pk eve.pub < header.alice.c4gh > header.eve.c4gh

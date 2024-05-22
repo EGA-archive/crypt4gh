@@ -41,7 +41,7 @@ function teardown() {
     crypt4gh encrypt --sk ${BOB_SECKEY} --recipient_pk ${BOB_PUBKEY} --header $TESTFILES/header.bob.c4gh < $TESTFILE > $TESTFILES/data.c4gh
 
     # Bob changes the header for Alice
-    crypt4gh reencrypt --sk ${BOB_SECKEY} --recipient_pk ${ALICE_PUBKEY} < $TESTFILES/header.bob.c4gh > $TESTFILES/header.alice.c4gh
+    crypt4gh reencrypt --sk ${BOB_SECKEY} --recipient_pk ${ALICE_PUBKEY} --header-only < $TESTFILES/header.bob.c4gh > $TESTFILES/header.alice.c4gh
 
     # Alice concatenates the header and data and decrypts the results
     export C4GH_PASSPHRASE=${ALICE_PASSPHRASE}

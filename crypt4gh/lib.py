@@ -407,7 +407,7 @@ def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
 
 
 @close_on_broken_pipe
-def reencrypt(keys, recipient_keys, infile, outfile, chunk_size=4096, trim=False):
+def reencrypt(keys, recipient_keys, infile, outfile, chunk_size=4096, trim=False, header_only=False):
     '''Extract header packets from infile and generate another one to outfile.
     The encrypted data section is only copied from infile to outfile.'''
 
@@ -416,13 +416,14 @@ def reencrypt(keys, recipient_keys, infile, outfile, chunk_size=4096, trim=False
     packets = header.reencrypt(header_packets, keys, recipient_keys, trim=trim)
     outfile.write(header.serialize(packets))
 
-    # Stream the remainder
-    LOG.info(f'Streaming the remainder of the file')
-    while True:
-        data = infile.read(chunk_size)
-        if not data:
-            break
-        outfile.write(data)
+    # Stream the remainder, if present
+    if not header_only:
+        LOG.info(f'Streaming the remainder of the file')
+        while True:
+            data = infile.read(chunk_size)
+            if not data:
+                break
+            outfile.write(data)
 
     LOG.info('Reencryption Successful')
 

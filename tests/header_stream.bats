@@ -22,12 +22,9 @@ function teardown() {
     export C4GH_PASSPHRASE=${BOB_PASSPHRASE}
     crypt4gh encrypt --sk ${BOB_SECKEY} --recipient_pk ${ALICE_PUBKEY} --header $TESTFILES/header.alice.c4gh < $TESTFILE > $TESTFILES/data.c4gh
 
-    # Alice concatenates the header and data
-    cat $TESTFILES/header.alice.c4gh $TESTFILES/data.c4gh > $TESTFILES/message.c4gh
-
-     # Alice decrypts the concatenated file
+     # Alice concatenates the header and the data and decrypts the combined result
     export C4GH_PASSPHRASE=${ALICE_PASSPHRASE}
-    crypt4gh decrypt --sk ${ALICE_SECKEY} < $TESTFILES/message.c4gh > $TESTFILES/message.received
+    cat $TESTFILES/header.alice.c4gh $TESTFILES/data.c4gh | crypt4gh decrypt --sk ${ALICE_SECKEY} > $TESTFILES/message.received
 
     run diff $TESTFILE $TESTFILES/message.received
     [ "$status" -eq 0 ]
@@ -46,12 +43,9 @@ function teardown() {
     # Bob changes the header for Alice
     crypt4gh reencrypt --sk ${BOB_SECKEY} --recipient_pk ${ALICE_PUBKEY} < $TESTFILES/header.bob.c4gh > $TESTFILES/header.alice.c4gh
 
-    # Alice concatenates the header and data
-    cat $TESTFILES/header.alice.c4gh $TESTFILES/data.c4gh > $TESTFILES/message.c4gh
-
-    # Alice decrypts the header and encrypted data
+    # Alice concatenates the header and data and decrypts the results
     export C4GH_PASSPHRASE=${ALICE_PASSPHRASE}
-    crypt4gh decrypt --sk ${ALICE_SECKEY} < $TESTFILES/message.c4gh > $TESTFILES/message.received
+    cat $TESTFILES/header.alice.c4gh $TESTFILES/data.c4gh | crypt4gh decrypt --sk ${ALICE_SECKEY} > $TESTFILES/message.received
 
     run diff $TESTFILE $TESTFILES/message.received
     [ "$status" -eq 0 ]

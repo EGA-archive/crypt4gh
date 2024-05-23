@@ -80,8 +80,7 @@ Bob can then decrypt the message by concatenating the header and the data, and d
 
 .. code-block:: console
 
-    $ cat header.bob.c4gh M.data.c4gh > M.c4gh
-    $ crypt4gh decrypt --sk bob.sec < M.c4gh > M
+    $ cat header.bob.c4gh M.data.c4gh | crypt4gh decrypt --sk bob.sec > M
 
 To re-encrypt the message for another user Eve, with public key ``eve.pub``, Alice can run the ``crypt4gh reencrypt`` command: 
 

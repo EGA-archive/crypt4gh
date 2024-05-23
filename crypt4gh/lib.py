@@ -416,14 +416,18 @@ def reencrypt(keys, recipient_keys, infile, outfile, chunk_size=4096, trim=False
     packets = header.reencrypt(header_packets, keys, recipient_keys, trim=trim)
     outfile.write(header.serialize(packets))
 
-    # Stream the remainder, if present
-    if not header_only:
-        LOG.info(f'Streaming the remainder of the file')
-        while True:
-            data = infile.read(chunk_size)
-            if not data:
-                break
-            outfile.write(data)
+    # If header-only reencryption, we are done.
+    if header_only:
+        LOG.info(f'Header-only reencryption Successful')
+        return
+
+    # Stream the remainder
+    LOG.info(f'Streaming the remainder of the file')
+    while True:
+        data = infile.read(chunk_size)
+        if not data:
+            break
+        outfile.write(data)
 
     LOG.info('Reencryption Successful')
 

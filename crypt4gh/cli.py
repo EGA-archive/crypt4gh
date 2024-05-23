@@ -29,7 +29,7 @@ Usage:
    {PROG} [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--range <start-end>] [--header <path>]
    {PROG} [-hv] [--log <file>] decrypt [--sk <path>] [--sender_pk <path>] [--range <start-end>]
    {PROG} [-hv] [--log <file>] rearrange [--sk <path>] --range <start-end>
-   {PROG} [-hv] [--log <file>] reencrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--trim]
+   {PROG} [-hv] [--log <file>] reencrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--trim] [--header-only]
 
 Options:
    -h, --help             Prints this help and exit
@@ -42,7 +42,7 @@ Options:
    --range <start-end>    Byte-range either as  <start-end> or just <start> (Start included, End excluded)
    -t, --trim             Keep only header packets that you can decrypt
    --header <path>        Where to write the header (default: stdout)
-
+   --header-only          Whether the input data consists only of a header (default: false)
 
 Environment variables:
    C4GH_LOG         If defined, it will be used as the default logger
@@ -222,4 +222,5 @@ def reencrypt(args):
                   recipient_keys,
                   sys.stdin.buffer,
                   sys.stdout.buffer,
-                  trim=args['--trim'])
+                  trim=args['--trim'],
+                  header_only=args['--header-only'])

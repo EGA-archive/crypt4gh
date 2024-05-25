@@ -46,7 +46,7 @@ def _encrypt_segment(data, process, key):
 
 
 @close_on_broken_pipe
-def encrypt(keys, infile, outfile, offset=0, span=None):
+def encrypt(keys, infile, outfile, headerfile=None, offset=0, span=None):
     '''Encrypt infile into outfile, using the list of keys.
 
 
@@ -57,6 +57,8 @@ def encrypt(keys, infile, outfile, offset=0, span=None):
     '''
 
     LOG.info('Encrypting the file')
+    
+    headerfile = headerfile or outfile
 
     # Forward to start position
     LOG.debug("  Start Coordinate: %s", offset)
@@ -91,7 +93,7 @@ def encrypt(keys, infile, outfile, offset=0, span=None):
     header_bytes = header.serialize(header_packets)
 
     LOG.debug('header length: %d', len(header_bytes))
-    outfile.write(header_bytes)
+    headerfile.write(header_bytes)
 
     # ...and cue music
     LOG.debug("Streaming content")
@@ -405,7 +407,7 @@ def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
 
 
 @close_on_broken_pipe
-def reencrypt(keys, recipient_keys, infile, outfile, chunk_size=4096, trim=False):
+def reencrypt(keys, recipient_keys, infile, outfile, chunk_size=4096, trim=False, header_only=False):
     '''Extract header packets from infile and generate another one to outfile.
     The encrypted data section is only copied from infile to outfile.'''
 
@@ -413,6 +415,11 @@ def reencrypt(keys, recipient_keys, infile, outfile, chunk_size=4096, trim=False
     header_packets = header.parse(infile)
     packets = header.reencrypt(header_packets, keys, recipient_keys, trim=trim)
     outfile.write(header.serialize(packets))
+
+    # If header-only reencryption, we are done.
+    if header_only:
+        LOG.info(f'Header-only reencryption Successful')
+        return
 
     # Stream the remainder
     LOG.info(f'Streaming the remainder of the file')

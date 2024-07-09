@@ -3,7 +3,7 @@
 
 import os
 import logging
-from itertools import chain
+import datetime
 # from types import GeneratorType
 
 from nacl.bindings import (crypto_kx_client_session_keys,
@@ -85,13 +85,17 @@ def serialize(packets):
 # Encrypted data packet
 # -------------------------------------
 
-PACKET_TYPE_DATA_ENC = b'\x00\x00\x00\x00'  # 0 little endian
+PACKET_TYPE_DATA_ENC  = b'\x00\x00\x00\x00'  # 0 little endian
 PACKET_TYPE_EDIT_LIST = b'\x01\x00\x00\x00' # 1 little endian
+PACKET_TYPE_TIMESTAMP = b'\x02\x00\x00\x00' # 2 little endian
+PACKET_TYPE_LINK      = b'\x03\x00\x00\x00' # 3 little endian
 
-def partition_packets(packets):
+def extract(packets):
 
     enc_packets = []
     edits = None
+    timestamp = None
+    link = None
 
     for packet in packets:
 
@@ -105,11 +109,21 @@ def partition_packets(packets):
                 raise ValueError('Invalid file: Too many edit list packets')
             edits = packet[4:]
 
+        elif packet_type == PACKET_TYPE_TIMESTAMP:
+            if timestamp is not None: # reject files if many timestamp
+                raise ValueError('Invalid file: Too many timestamp packets')
+            timestamp = packet[4:]
+
+        elif packet_type == PACKET_TYPE_LINK:
+            if link is not None: # reject files if many links
+                raise ValueError('Invalid file: Too many links')
+            link = packet[4:]
+
         else: # Bark if unsupported packet. Don't just ignore it
             packet_type = int.from_bytes(packet_type, byteorder='little')
             raise ValueError(f'Invalid packet type {packet_type}')
 
-    return (enc_packets, edits)
+    return (enc_packets, edits, timestamp, link)
 
 # -------------------------------------
 # Encrypted data packet
@@ -159,6 +173,31 @@ def parse_edit_list_packet(packet):
     if nb_lengths < 0 or len(packet) - 4 < 8 * nb_lengths: # don't bark if longer
         raise ValueError('Invalid edit list')
     return (int.from_bytes(packet[i:i+8], byteorder='little') for i in range(4, nb_lengths * 8, 8)) # generator
+
+# -------------------------------------
+# Timestamp packet
+# -------------------------------------
+def make_packet_timestamp(timestamp):
+    return (PACKET_TYPE_TIMESTAMP
+            + int(timestamp).to_bytes(8,'little')) # we drop the milliseconds
+
+def parse_timestamp_packet(packet):
+    if len(packet) != 8:
+        raise ValueError('Invalid timestamp packet')
+    return datetime.datetime.fromtimestamp(int.from_bytes(packet, byteorder='little'), datetime.UTC)
+
+# -------------------------------------
+# link packet
+# -------------------------------------
+def make_packet_link(link):
+    return (PACKET_TYPE_LINK
+            # + len(link).to_bytes(4,'little') 
+            + link)
+
+def parse_link_packet(packet):
+    # size = int.from_bytes(packet[:4], byteorder='little')
+    # return packet[:size]
+    return packet
 
 # -------------------------------------
 # Header Encryption Methods Conventions
@@ -315,11 +354,13 @@ def deconstruct(infile, keys, sender_pubkey=None):
     if not packets: # no packets were decrypted
         raise ValueError('No supported encryption method')
 
-    data_packets, edit_packet = partition_packets(packets)
+    data_packets, edit_packet, timestamp_packet, link_packet = extract(packets)
     # Parse returns the session key (since it should be method 0) 
     session_keys = [parse_enc_packet(packet) for packet in data_packets]
     edit_list = parse_edit_list_packet(edit_packet) if edit_packet else None
-    return session_keys, edit_list
+    expiration = parse_timestamp_packet(timestamp_packet) if timestamp_packet else None
+    link = parse_link_packet(link_packet) if link_packet else None
+    return session_keys, edit_list, expiration, link
 
 # -------------------------------------
 # Header Re-Encryption
@@ -376,7 +417,7 @@ def rearrange(header_packets, keys, offset=0, span=None, sender_pubkey=None):
     if not decrypted_packets:
         raise ValueError('No header packet could be decrypted')
 
-    data_packets, edit_packet = partition_packets(decrypted_packets)
+    data_packets, edit_packet, timestamp_packet, link_packet = extract(decrypted_packets)
 
     #
     # Note: We do not yet implement chunking a file that already contains an Edit List
@@ -416,7 +457,11 @@ def rearrange(header_packets, keys, offset=0, span=None, sender_pubkey=None):
     LOG.info('Reencrypting all packets')
 
     packets = [PACKET_TYPE_DATA_ENC + packet for packet in data_packets]
-    packets.append(edit_packet) # adding the edit list at the end
+    packets.append(edit_packet)
+    if timestamp_packet:
+        packets.append(timestamp_packet)
+    if link_packet:
+        packets.append(link_packet)
     packets = [encrypted_packet for packet in packets for encrypted_packet in encrypt(packet, keys)]
 
     return packets, segment_oracle()

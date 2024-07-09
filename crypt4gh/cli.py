@@ -7,6 +7,7 @@ import logging.config
 from functools import partial
 from getpass import getpass
 import re
+import datetime
 
 from docopt import docopt
 from nacl.public import PrivateKey
@@ -26,7 +27,7 @@ __doc__ = f'''
 Utility for the cryptographic GA4GH standard, reading from stdin and outputting to stdout.
 
 Usage:
-   {PROG} [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--range <start-end>] [--header <path>]
+   {PROG} [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--range <start-end>] [--header <path>] [--expiration <date>]
    {PROG} [-hv] [--log <file>] decrypt [--sk <path>] [--sender_pk <path>] [--range <start-end>]
    {PROG} [-hv] [--log <file>] rearrange [--sk <path>] --range <start-end>
    {PROG} [-hv] [--log <file>] reencrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--trim] [--header-only]
@@ -43,6 +44,7 @@ Options:
    -t, --trim             Keep only header packets that you can decrypt
    --header <path>        Where to write the header (default: stdout)
    --header-only          Whether the input data consists only of a header (default: false)
+   --expiration <date>    Expiration date (in ISO format)
 
 Environment variables:
    C4GH_LOG         If defined, it will be used as the default logger
@@ -124,6 +126,12 @@ def retrieve_private_key(args, generate=False):
 
     return get_private_key(seckeypath, cb)
 
+def make_timestamp(date):
+    # if date.startswith('+'):
+    #     return int((datetime.datetime.now(datetime.UTC) + parse_deltatime(date[1:])).timestamp())
+    LOG.debug("expiration: %s", date)
+    return int(datetime.datetime.fromisoformat(date).timestamp())
+
 def encrypt(args):
     assert( args['encrypt'] )
 
@@ -148,6 +156,10 @@ def encrypt(args):
         raise ValueError("No Recipients' Public Key found")
 
     header = args["--header"]
+    timestamp = args["--expiration"]
+    if timestamp:
+        timestamp = make_timestamp(timestamp)
+        LOG.debug("timestamp: %s", timestamp)
 
     try:
         if header:
@@ -157,7 +169,8 @@ def encrypt(args):
                     sys.stdout.buffer,
                     headerfile = header,
                     offset = range_start,
-                    span = range_span)
+                    span = range_span,
+                    timestamp = timestamp)
     finally:
         if header:
             header.close()

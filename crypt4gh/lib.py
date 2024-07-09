@@ -5,6 +5,8 @@ import os
 import logging
 import io
 import collections
+from itertools import chain
+import datetime
 
 from nacl.bindings import (crypto_aead_chacha20poly1305_ietf_encrypt,
                            crypto_aead_chacha20poly1305_ietf_decrypt)
@@ -14,6 +16,7 @@ from nacl.exceptions import CryptoError
 from . import SEGMENT_SIZE
 from .exceptions import close_on_broken_pipe
 from . import header
+from .fetcher import Fetcher, URLFetcher
 
 LOG = logging.getLogger(__name__)
 
@@ -46,7 +49,7 @@ def _encrypt_segment(data, process, key):
 
 
 @close_on_broken_pipe
-def encrypt(keys, infile, outfile, headerfile=None, offset=0, span=None):
+def encrypt(keys, infile, outfile, headerfile=None, offset=0, span=None, timestamp=None):
     '''Encrypt infile into outfile, using the list of keys.
 
 
@@ -88,8 +91,12 @@ def encrypt(keys, infile, outfile, headerfile=None, offset=0, span=None):
 
     # Output the header
     LOG.debug('Creating Crypt4GH header')
-    header_content = header.make_packet_data_enc(encryption_method, session_key)
-    header_packets = header.encrypt(header_content, keys)
+    header_packets = header.encrypt(header.make_packet_data_enc(encryption_method, session_key),
+                                    keys)
+    if timestamp:
+        header_packets = chain(header_packets,
+                               header.encrypt(header.make_packet_timestamp(timestamp),
+                                              keys))
     header_bytes = header.serialize(header_packets)
 
     LOG.debug('header length: %d', len(header_bytes))
@@ -380,9 +387,17 @@ def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
         )
     )
 
-    session_keys, edit_list = header.deconstruct(infile, keys, sender_pubkey=sender_pubkey)
+    session_keys, edit_list, expiration, link = header.deconstruct(infile, keys, sender_pubkey=sender_pubkey)
+
+    if expiration and (datetime.datetime.now(datetime.UTC) > expiration):
+        raise ValueError(f'Expired on {expiration}')
 
     # Infile in now positioned at the beginning of the data portion
+    # or we fetch the data portion from the link.
+    if link:
+        # replacing the infile with a fetcher
+        outfile = URLFetcher(link)
+        # Note: the remainder of the infile might not be empty
 
     # Generator to slice the output
     output = limited_output(offset=offset, limit=span, process=outfile.write)

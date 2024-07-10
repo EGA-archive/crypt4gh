@@ -192,12 +192,12 @@ def parse_timestamp_packet(packet):
 def make_packet_link(link):
     return (PACKET_TYPE_LINK
             # + len(link).to_bytes(4,'little') 
-            + link)
+            + link.encode())
 
 def parse_link_packet(packet):
     # size = int.from_bytes(packet[:4], byteorder='little')
     # return packet[:size]
-    return packet
+    return packet.decode()
 
 # -------------------------------------
 # Header Encryption Methods Conventions

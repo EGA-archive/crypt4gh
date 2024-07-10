@@ -16,7 +16,7 @@ from nacl.exceptions import CryptoError
 from . import SEGMENT_SIZE
 from .exceptions import close_on_broken_pipe
 from . import header
-from .fetcher import Fetcher, URLFetcher
+from .fetcher import Fetcher
 
 LOG = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ def _encrypt_segment(data, process, key):
 
 
 @close_on_broken_pipe
-def encrypt(keys, infile, outfile, headerfile=None, offset=0, span=None, timestamp=None):
+def encrypt(keys, infile, outfile, headerfile=None, offset=None, span=None, timestamp=None, uri=None):
     '''Encrypt infile into outfile, using the list of keys.
 
 
@@ -60,7 +60,7 @@ def encrypt(keys, infile, outfile, headerfile=None, offset=0, span=None, timesta
     '''
 
     LOG.info('Encrypting the file')
-    
+
     headerfile = headerfile or outfile
 
     # Forward to start position
@@ -97,10 +97,19 @@ def encrypt(keys, infile, outfile, headerfile=None, offset=0, span=None, timesta
         header_packets = chain(header_packets,
                                header.encrypt(header.make_packet_timestamp(timestamp),
                                               keys))
+    if uri:
+        header_packets = chain(header_packets,
+                               header.encrypt(header.make_packet_link(uri),
+                                              keys))
+
     header_bytes = header.serialize(header_packets)
 
     LOG.debug('header length: %d', len(header_bytes))
     headerfile.write(header_bytes)
+
+    if uri:
+        LOG.info('Encryption Successful via the URI: %s', uri)
+        return
 
     # ...and cue music
     LOG.debug("Streaming content")
@@ -396,7 +405,7 @@ def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
     # or we fetch the data portion from the URI.
     if uri:
         # replacing the infile with a fetcher
-        outfile = URLFetcher(uri)
+        outfile = Fetcher(uri)
         # Note: the remainder of the infile might not be empty
 
     # Generator to slice the output

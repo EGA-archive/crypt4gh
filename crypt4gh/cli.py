@@ -29,8 +29,9 @@ Utility for the cryptographic GA4GH standard, reading from stdin and outputting 
 Usage:
    {PROG} [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--range <start-end>] [--header <path>] [--expiration <date>] [--uri <path>]
    {PROG} [-hv] [--log <file>] decrypt [--sk <path>] [--sender_pk <path>] [--range <start-end>]
-   {PROG} [-hv] [--log <file>] rearrange [--sk <path>] --range <start-end>
    {PROG} [-hv] [--log <file>] reencrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--trim] [--header-only]
+   {PROG} [-hv] [--log <file>] rearrange [--sk <path>] --range <start-end>
+   {PROG} [-hv] [--log <file>] repoint [--sk <path>] --uri <path>
 
 Options:
    -h, --help             Prints this help and exit
@@ -84,9 +85,6 @@ def parse_args(argv=sys.argv[1:]):
     if args['--range'] is not None and args['--uri'] is not None:
         raise ValueError('Can not mix --range and --uri')
 
-    if args['--uri'] is not None and args['--header'] is None:
-        raise ValueError('--uri requires --header')
-
     # print(args)
     return args
 
@@ -139,6 +137,9 @@ def make_timestamp(date):
 
 def encrypt(args):
     assert( args['encrypt'] )
+
+    if args['--uri'] is not None and args['--header'] is None:
+        raise ValueError('--uri requires --header')
 
     range_start, range_span = parse_range(args)
 
@@ -245,3 +246,19 @@ def reencrypt(args):
                   sys.stdout.buffer,
                   trim=args['--trim'],
                   header_only=args['--header-only'])
+
+def repoint(args):
+    assert( args['repoint'] )
+
+    # if args['--uri'] is None: 
+    #     raise ValueError('--uri is required')
+
+    seckey = retrieve_private_key(args)
+
+    keys = [(0, seckey, bytes(PrivateKey(seckey).public_key))] # keys = list of (method, privkey, recipient_pubkey=ourselves)
+
+    lib.repoint(keys,
+                sys.stdin.buffer,
+                sys.stdout.buffer,
+                args['--uri'])
+

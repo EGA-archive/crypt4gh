@@ -66,4 +66,23 @@ We use the testfile and Bob encrypts it for himself.
       Expected outcome: They both can read the same content as Bob had.
 
 
+## Payload as URI
+
+
+- [x] Bob sends the testfile secretly Alice, over an URI<br/>
+      Expected outcome: Alice reads the same content as testfile.
+
+- [x] Bob sends the testfile secretly Alice, over an URI, and moves its payload.<br/>
+      Expected outcome: Alice repoints to the new URI and reads the same content as testfile.
+
+## Expiration dates
+
+
+- [x] Bob sends the testfile secretly Alice, with a past expiration date<br/>
+      Expected outcome: Alice can't decrypt the file.
+
+- [x] Bob sends the testfile secretly Alice, with a future expiration date<br/>
+      Expected outcome: Alice reads the same content as testfile.
+
+
 

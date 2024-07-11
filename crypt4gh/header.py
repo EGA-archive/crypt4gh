@@ -468,3 +468,43 @@ def rearrange(header_packets, keys, offset=0, span=None, sender_pubkey=None):
     return packets, segment_oracle()
 
 
+# -------------------------------------
+# Header Re-Arrange
+# -------------------------------------
+
+def repoint(header_packets, keys, uri, sender_pubkey=None):
+    '''
+    Re-point the link to the given URI.
+    
+    :returns: the packet list as-is, replacing with (or adding) a new link packet.
+
+    Note: we trim the packets we couldn't decrypt
+    '''
+
+    LOG.info('Repointing the header to URI: %s', uri)
+
+    decrypted_packets, _ = decrypt(header_packets, keys, sender_pubkey=sender_pubkey)
+
+    if not decrypted_packets:
+        raise ValueError('No header packet could be decrypted')
+
+    data_packets, edits, timestamp, link = extract(decrypted_packets)
+
+    if link is None:
+        LOG.warning('Ignoring existing link poiting to %s', link)
+
+
+    LOG.info('Reencrypting all packets')
+
+    packets = [PACKET_TYPE_DATA_ENC + packet for packet in data_packets]
+    packets.append(make_packet_link(uri)) # Adding a new URI
+    if timestamp is not None:
+        packets.append(make_packet_timestamp(timestamp))
+    if edits is not None:
+        packets.append(make_packet_data_edit_list(edits))
+
+    packets = [encrypted_packet for packet in packets for encrypted_packet in encrypt(packet, keys)]
+
+    return packets
+
+

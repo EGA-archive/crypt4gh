@@ -40,7 +40,7 @@ $ crypt4gh -h
 Utility for the cryptographic GA4GH standard, reading from stdin and outputting to stdout.
 
 Usage:
-   {PROG} [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--range <start-end>]  [--header <path>] [--expiration <date>]
+   {PROG} [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--range <start-end>]  [--header <path>] [--expiration <date>] [--uri <path>]
    {PROG} [-hv] [--log <file>] decrypt [--sk <path>] [--sender_pk <path>] [--range <start-end>]
    {PROG} [-hv] [--log <file>] rearrange [--sk <path>] --range <start-end>
    {PROG} [-hv] [--log <file>] reencrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--trim] [--header-only]
@@ -58,6 +58,7 @@ Options:
    --header <path>        Where to write the header (default: stdout)
    --header-only          Whether the input data consists only of a header (default: false)
    --expiration <date>    Expiration date (in ISO format)
+   --uri <path>           Fully Qualified URI Path to the payload location
 
 
 Environment variables:

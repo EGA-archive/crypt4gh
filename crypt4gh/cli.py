@@ -134,8 +134,6 @@ def retrieve_private_key(args, generate=False):
     return get_private_key(seckeypath, cb)
 
 def make_timestamp(date):
-    # if date.startswith('+'):
-    #     return int((datetime.datetime.now(datetime.UTC) + parse_deltatime(date[1:])).timestamp())
     LOG.debug("expiration: %s", date)
     return int(datetime.datetime.fromisoformat(date).timestamp())
 

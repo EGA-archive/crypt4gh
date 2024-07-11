@@ -10,6 +10,7 @@ jobs:
       max-parallel: 6
       matrix:
         python-version: ['3.7', '3.8', '3.9', '3.10', '3.11', '3.12']
+        bats-version: ['v1.11.0']
 
     steps:
     - uses: actions/checkout@v4
@@ -23,7 +24,7 @@ jobs:
         pip install -r requirements.txt
         pip install -e .
         git clone https://github.com/bats-core/bats-core.git
-        pushd bats-core && git checkout v1.1.0 && sudo ./install.sh /usr/local && popd
+        pushd bats-core && git checkout ${{ matrix.bats-version }} && sudo ./install.sh /usr/local && popd
     - name: Test with bats
       run: |
         bats tests

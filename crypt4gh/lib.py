@@ -107,9 +107,8 @@ def encrypt(keys, infile, outfile, headerfile=None, offset=None, span=None, time
     LOG.debug('header length: %d', len(header_bytes))
     headerfile.write(header_bytes)
 
-    if uri:
-        LOG.info('Encryption Successful via the URI: %s', uri)
-        return
+    if uri and headerfile is outfile:
+        raise ValueError('The header stream and output stream must be different')
 
     # ...and cue music
     LOG.debug("Streaming content")
@@ -405,7 +404,7 @@ def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
     # or we fetch the data portion from the URI.
     if uri:
         # replacing the infile with a fetcher
-        outfile = Fetcher(uri)
+        infile = Fetcher(uri)
         # Note: the remainder of the infile might not be empty
 
     # Generator to slice the output

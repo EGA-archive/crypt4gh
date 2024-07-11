@@ -84,6 +84,9 @@ def parse_args(argv=sys.argv[1:]):
     if args['--range'] is not None and args['--uri'] is not None:
         raise ValueError('Can not mix --range and --uri')
 
+    if args['--uri'] is not None and args['--header'] is None:
+        raise ValueError('--uri requires --header')
+
     # print(args)
     return args
 

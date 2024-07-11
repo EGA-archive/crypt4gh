@@ -387,16 +387,16 @@ def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
         )
     )
 
-    session_keys, edit_list, expiration, link = header.deconstruct(infile, keys, sender_pubkey=sender_pubkey)
+    session_keys, edit_list, expiration, uri = header.deconstruct(infile, keys, sender_pubkey=sender_pubkey)
 
     if expiration and (datetime.datetime.now(datetime.UTC) > expiration):
         raise ValueError(f'Expired on {expiration}')
 
     # Infile in now positioned at the beginning of the data portion
-    # or we fetch the data portion from the link.
-    if link:
+    # or we fetch the data portion from the URI.
+    if uri:
         # replacing the infile with a fetcher
-        outfile = URLFetcher(link)
+        outfile = URLFetcher(uri)
         # Note: the remainder of the infile might not be empty
 
     # Generator to slice the output

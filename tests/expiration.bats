@@ -20,13 +20,15 @@ function teardown() {
 
     # Bob encrypts the testfile for Alice
     export C4GH_PASSPHRASE=${BOB_PASSPHRASE}
-    EXP_DATE=$(date -jf %s $(( $(date +%s) - 86400 * 2 )))
-    crypt4gh encrypt --sk ${BOB_SECKEY} --recipient_pk ${BOB_PUBKEY} --recipient_pk ${ALICE_PUBKEY} --expiration "${EXP_DATE}" < $TESTFILE > $TESTFILES/message.c4gh
+    EXP_DATE=$(date -Iseconds -jf %s $(( $(date +%s) - 86400 * 2 )))
+    crypt4gh encrypt --recipient_pk ${ALICE_PUBKEY} --expiration "${EXP_DATE}" < $TESTFILE > $TESTFILES/message.c4gh
 
     # Alice decrypts it
     export C4GH_PASSPHRASE=${ALICE_PASSPHRASE}
-    crypt4gh decrypt --sk ${ALICE_SECKEY} < $TESTFILES/message.c4gh > $TESTFILES/message.alice.received
-    [ "$status" -ne 0 ]
+    crypt4gh decrypt --sk ${ALICE_SECKEY} < $TESTFILES/message.c4gh 2>$TESTFILES/message.alice.error >$TESTFILES/message.alice.received
+
+    run grep -q 'Expired on' $TESTFILES/message.alice.error
+    [ "$status" -eq 0 ]
 
     unset C4GH_PASSPHRASE
 }
@@ -37,8 +39,8 @@ function teardown() {
 
     # Bob encrypts the testfile for Alice
     export C4GH_PASSPHRASE=${BOB_PASSPHRASE}
-    EXP_DATE=$(date -jf %s $(( $(date +%s) + 86400 * 2 )))
-    crypt4gh encrypt --sk ${BOB_SECKEY} --recipient_pk ${BOB_PUBKEY} --recipient_pk ${ALICE_PUBKEY} --expiration "${EXP_DATE}" < $TESTFILE > $TESTFILES/message.c4gh
+    EXP_DATE=$(date -Iseconds -jf %s $(( $(date +%s) + 86400 * 2 )))
+    crypt4gh encrypt --sk ${BOB_SECKEY} --recipient_pk ${ALICE_PUBKEY} --expiration "${EXP_DATE}" < $TESTFILE > $TESTFILES/message.c4gh
 
     # Alice decrypts it
     export C4GH_PASSPHRASE=${ALICE_PASSPHRASE}

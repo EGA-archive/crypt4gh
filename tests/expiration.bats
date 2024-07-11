@@ -25,10 +25,9 @@ function teardown() {
 
     # Alice decrypts it
     export C4GH_PASSPHRASE=${ALICE_PASSPHRASE}
-    crypt4gh decrypt --sk ${ALICE_SECKEY} < $TESTFILES/message.c4gh 2>$TESTFILES/message.alice.error >$TESTFILES/message.alice.received
+    run --separate-stderr crypt4gh decrypt --sk ${ALICE_SECKEY} < $TESTFILES/message.c4gh
 
-    run grep -q 'Expired on' $TESTFILES/message.alice.error
-    [ "$status" -eq 0 ]
+    [[ "$stderr" =~ "Expired on" ]]
 
     unset C4GH_PASSPHRASE
 }

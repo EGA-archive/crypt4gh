@@ -13,7 +13,7 @@ def main(argv=sys.argv[1:]):
         args = cli.parse_args(argv)
 
         # Main Commands
-        for command in ('encrypt', 'decrypt', 'rearrange', 'reencrypt'):
+        for command in ('encrypt', 'decrypt', 'rearrange', 'reencrypt', 'repoint'):
             if args.get(command):
                 cmd = getattr(cli,command,None)
                 if not cmd:

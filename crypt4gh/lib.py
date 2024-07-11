@@ -494,3 +494,28 @@ def rearrange(keys, infile, outfile, offset=0, span=None):
     del segment_oracle # enough to terminate and remove it?
     LOG.info('Rearrangement Successful')
 
+
+##############################################################
+##
+##   Adding or Updating an URI in the header
+##
+##############################################################
+
+@close_on_broken_pipe
+def repoint(keys, infile, outfile, uri):
+    '''Extract header packets from infile, replacing with (or adding) a new link packet.
+    The new header is sent to the outfile.
+    '''
+
+    # Decrypt and re-encrypt the header
+    header_packets = header.parse(infile)
+
+    packets = header.repoint(header_packets, keys, uri)
+    outfile.write(header.serialize(packets))
+
+    remainder = infile.read(1)
+    if not remainder:
+        LOG.info('Repointing Successful')
+    else:
+        LOG.warning('Not at the end of the file: Truncating here')
+

@@ -184,7 +184,8 @@ def make_packet_timestamp(timestamp):
 def parse_timestamp_packet(packet):
     if len(packet) != 8:
         raise ValueError('Invalid timestamp packet')
-    return datetime.datetime.fromtimestamp(int.from_bytes(packet, byteorder='little'), datetime.UTC)
+    # return datetime.datetime.fromtimestamp(int.from_bytes(packet, byteorder='little'))
+    return int.from_bytes(packet, byteorder='little')
 
 # -------------------------------------
 # link packet

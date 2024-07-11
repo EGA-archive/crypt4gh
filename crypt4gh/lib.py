@@ -7,6 +7,7 @@ import io
 import collections
 from itertools import chain
 import datetime
+import time
 
 from nacl.bindings import (crypto_aead_chacha20poly1305_ietf_encrypt,
                            crypto_aead_chacha20poly1305_ietf_decrypt)
@@ -397,8 +398,8 @@ def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
 
     session_keys, edit_list, expiration, uri = header.deconstruct(infile, keys, sender_pubkey=sender_pubkey)
 
-    if expiration and (datetime.datetime.fromtimestamp(time.time()) > expiration):
-        raise ValueError(f'Expired on {expiration}')
+    if expiration and (time.time() > expiration): # now > expiration_timestamp
+        raise ValueError(f'Expired on {datetime.datetime.fromtimestamp(expiration)}')
 
     # Infile in now positioned at the beginning of the data portion
     # or we fetch the data portion from the URI.

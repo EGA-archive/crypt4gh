@@ -16,6 +16,7 @@ function teardown() {
 
 @test "Bob sends the testfile secretly to Alice, with a past expiration date" {
 
+    bats_require_minimum_version 1.5.0
     TESTFILE=${BATS_TEST_DIRNAME}/_common/testfile.abcd
 
     # Bob encrypts the testfile for Alice
@@ -34,6 +35,7 @@ function teardown() {
 
 @test "Bob sends the testfile secretly to Alice, with a future expiration date" {
 
+    bats_require_minimum_version 1.5.0
     TESTFILE=${BATS_TEST_DIRNAME}/_common/testfile.abcd
 
     # Bob encrypts the testfile for Alice

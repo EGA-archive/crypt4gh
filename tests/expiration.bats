@@ -20,7 +20,7 @@ function teardown() {
 
     # Bob encrypts the testfile for Alice
     export C4GH_PASSPHRASE=${BOB_PASSPHRASE}
-    EXP_DATE=$(date -Iseconds -jf %s $(( $(date +%s) - 86400 * 2 )))
+    EXP_DATE=$(python -c 'import time,datetime; print(datetime.datetime.fromtimestamp(time.time() - 86400 * 2).isoformat())')
     crypt4gh encrypt --recipient_pk ${ALICE_PUBKEY} --expiration "${EXP_DATE}" < $TESTFILE > $TESTFILES/message.c4gh
 
     # Alice decrypts it
@@ -38,7 +38,7 @@ function teardown() {
 
     # Bob encrypts the testfile for Alice
     export C4GH_PASSPHRASE=${BOB_PASSPHRASE}
-    EXP_DATE=$(date -Iseconds -jf %s $(( $(date +%s) + 86400 * 2 )))
+    EXP_DATE=$(python -c 'import time,datetime; print(datetime.datetime.fromtimestamp(time.time() + 86400 * 2).isoformat())')
     crypt4gh encrypt --sk ${BOB_SECKEY} --recipient_pk ${ALICE_PUBKEY} --expiration "${EXP_DATE}" < $TESTFILE > $TESTFILES/message.c4gh
 
     # Alice decrypts it

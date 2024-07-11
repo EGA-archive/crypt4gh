@@ -397,7 +397,7 @@ def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
 
     session_keys, edit_list, expiration, uri = header.deconstruct(infile, keys, sender_pubkey=sender_pubkey)
 
-    if expiration and (datetime.datetime.now(datetime.UTC) > expiration):
+    if expiration and (datetime.datetime.fromtimestamp(time.time()) > expiration):
         raise ValueError(f'Expired on {expiration}')
 
     # Infile in now positioned at the beginning of the data portion

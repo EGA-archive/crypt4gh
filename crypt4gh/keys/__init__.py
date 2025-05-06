@@ -8,6 +8,7 @@ import io
 import logging
 import logging.config
 from base64 import b64decode, b64encode
+from functools import partial
 from getpass import getpass
 
 from docopt import docopt
@@ -28,7 +29,7 @@ __doc__ = f'''
 Utility to create Crypt4GH-formatted keys.
 
 Usage:
-   {PROG}-keygen [-hv] [--log <file>] [-f] [--pk <path>] [--sk <path>] [--nocrypt] [-C <comment>]
+   {PROG}-keygen [-hv] [--log <file>] [-f] [--pk <path>] [--sk <path>] [--nocrypt] [-C <comment>] [--relock]
 
 Options:
    -h, --help             Prints this help and exit
@@ -41,6 +42,7 @@ Options:
                           Otherwise it is encrypted in the Crypt4GH key format
                           (See https://crypt4gh.readthedocs.io/en/latest/keys.html)
    -f                     Overwrite the destination files
+   --relock               Re-lock the private key with a new passphrase
 
 
 Environment variables:
@@ -155,6 +157,30 @@ def run(argv=sys.argv[1:]):
 
     pubkey = os.path.expanduser(args['--pk'])
     seckey = os.path.expanduser(args['--sk'])
+    comment = args['-C'].encode() if args['-C'] else None
+
+    if args['--relock']:
+        seckeypath = os.path.expanduser(seckey)
+        if not os.path.exists(seckeypath):
+            raise ValueError('Secret key not found')
+        old_passphrase = os.getenv('C4GH_PASSPHRASE')
+        cb = partial(getpass, prompt=f'Passphrase for {seckey}: ') if old_passphrase is None else lambda: old_passphrase
+        seckey_decrypted = get_private_key(seckeypath, cb)
+        passphrase1 = getpass(prompt=f'Enter new passphrase for {args["--sk"]} (empty for no passphrase): ').encode()
+        passphrase2 = getpass(prompt=f'Enter new passphrase for {args["--sk"]} (again): ').encode()
+        if passphrase1 != passphrase2:
+            print('Passphrases do not match', file=sys.stderr)
+            return 1
+        seckey_reencrypted = c4gh.encode_private_key(
+            key = seckey_decrypted,
+            passphrase = passphrase1,
+            comment = comment
+        )
+        with open(seckey, 'bw') as f:
+            f.write(b'-----BEGIN CRYPT4GH PRIVATE KEY-----\n')
+            f.write(b64encode(seckey_reencrypted))
+            f.write(b'\n-----END CRYPT4GH PRIVATE KEY-----\n')
+        return
 
     for k in (pubkey, seckey):
         if os.path.isfile(k):
@@ -166,7 +192,6 @@ def run(argv=sys.argv[1:]):
                     return
             os.remove(k)
 
-    comment = args['-C'].encode() if args['-C'] else None
 
     print("Generating public/private Crypt4GH key pair{}.".format(f" (for {args['-C']}" if comment else ""))
     passphrase1 = passphrase2 = None

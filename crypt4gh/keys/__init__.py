@@ -140,7 +140,7 @@ def run(argv=sys.argv[1:]):
 
     # Parse CLI arguments
     version = f'{__title__} (version {__version__})'
-    args = docopt(__doc__, argv, help=True, version=version)
+    args = docopt(__doc__, argv, version=version)
 
     # Logging
     logger = args['--log'] or DEFAULT_LOG

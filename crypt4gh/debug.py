@@ -54,7 +54,7 @@ Environment variables:
 def parse_args(argv=sys.argv[1:]):
 
     version = f'{__title__} (version {__version__})'
-    args = docopt(__doc__, argv, help=True, version=version)
+    args = docopt(__doc__, argv, version=version)
 
     # if args['version']: print(version); sys.exit(0)
     # if args['help']: print(__doc__.strip()); sys.exit(0)

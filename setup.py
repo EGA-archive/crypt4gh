@@ -53,7 +53,7 @@ setup(name='crypt4gh',
       # See https://packaging.python.org/discussions/install-requires-vs-requirements/
       install_requires=[
           'pyYaml>=5.1.2',
-          'docopt', # include version when needed
+          'docopt-ng', # include version when needed
           'cryptography>=2.8',
           'pynacl>=1.3.0',
           'bcrypt', # include version when needed

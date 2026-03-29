@@ -68,7 +68,7 @@ jobs:
     - name: Install pkg-config and libsodium (macOS)
       if: matrix.os == 'macos-latest'
       run: |
-        brew install pkg-config libsodium
+        brew install pkg-config libsodium bash
 
     - name: Install pkg-config and libsodium (Ubuntu)
       if: matrix.os == 'ubuntu-latest'

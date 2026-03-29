@@ -9,10 +9,9 @@ from getpass import getpass
 import re
 
 from docopt import docopt
-from nacl.public import PrivateKey
 
 from . import __title__, __version__, PROG
-from . import lib
+from . import lib, sodium
 from .keys import get_public_key, get_private_key
 
 LOG = logging.getLogger(__name__)
@@ -105,8 +104,7 @@ def retrieve_private_key(args, generate=False):
     seckey = args['--sk'] or DEFAULT_SK
 
     if generate and seckey is None: # generate a one on the fly
-        sk = PrivateKey.generate()
-        skey = bytes(sk)
+        skey = os.urandom(32)
         LOG.debug('Generating Private Key: %s', skey.hex().upper())
         return skey
 
@@ -188,8 +186,9 @@ def rearrange(args):
     range_start, range_span = parse_range(args)
 
     seckey = retrieve_private_key(args)
+    pubkey = sodium.derive_pk(seckey)
 
-    keys = [(0, seckey, bytes(PrivateKey(seckey).public_key))] # keys = list of (method, privkey, recipient_pubkey=ourselves)
+    keys = [(0, seckey, pubkey)] # keys = list of (method, privkey, recipient_pubkey=ourselves)
 
     lib.rearrange(keys,
                   sys.stdin.buffer,

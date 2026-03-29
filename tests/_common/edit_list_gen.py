@@ -14,6 +14,7 @@ from getpass import getpass
 
 from crypt4gh.keys import get_private_key, get_public_key
 from crypt4gh import header, lib, SEGMENT_SIZE
+from crypt4gh.lib import sodium
 
 if __name__ == '__main__':
 
@@ -88,18 +89,16 @@ if __name__ == '__main__':
     outfile = sys.stdout.buffer
     
     segment = bytearray(SEGMENT_SIZE)
+    ciphersegment = bytearray(lib.CIPHER_SEGMENT_SIZE)
     while True:
         segment_len = infile.readinto(segment)
 
         if segment_len == 0: # finito
             break
 
-        if segment_len < SEGMENT_SIZE: # not a full segment
-            data = bytes(segment[:segment_len]) # to discard the bytes from the previous segments
-            lib._encrypt_segment(data, outfile.write, session_key)
-            break
-
-        data = bytes(segment) # this is a full segment
-        lib._encrypt_segment(data, outfile.write, session_key)
+        clen = sodium.chacha20poly1305_encrypt(ciphersegment,
+                                               segment[:segment_len],
+                                               memoryview(session_key))
+        outfile.write(ciphersegment[:clen])
 
 

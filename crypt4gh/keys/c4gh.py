@@ -3,7 +3,6 @@ import os
 import sys
 from base64 import b64encode
 
-from nacl.public import PrivateKey
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
 from .kdf import derive_key, get_kdf, scrypt_supported, KDFS
@@ -64,8 +63,8 @@ def generate(seckey, pubkey, passphrase=None, comment=None):
     '''Generate a keypair.'''
 
     # Generate the keys
-    sk = PrivateKey.generate()
-    LOG.debug('Private Key: %s', bytes(sk).hex().upper())
+    sk = os.urandom(32)
+    LOG.debug('Private Key: %s', sk.hex().upper())
 
     os.umask(0o277) # Restrict to r-- --- ---
 
@@ -82,7 +81,7 @@ def generate(seckey, pubkey, passphrase=None, comment=None):
 
     with open(pubkey, 'bw', ) as f:
         f.write(b'-----BEGIN CRYPT4GH PUBLIC KEY-----\n')
-        pkey = bytes(sk.public_key)
+        pkey = sodium.derive_pk(sk)
         LOG.debug('Public Key: %s', pkey.hex().upper())
         f.write(b64encode(pkey))
         f.write(b'\n-----END CRYPT4GH PUBLIC KEY-----\n')

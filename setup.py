@@ -1,13 +1,25 @@
 import sys
 assert sys.version_info >= (3, 6), "crypt4gh requires python 3.6 or higher"
-
+import subprocess
 from pathlib import Path
-from setuptools import setup, find_packages
+
+from setuptools import setup, find_packages, Extension
 
 _readme = (Path(__file__).parent / "README.md").read_text()
 
+def pkg_config(*args):
+    try:
+        cmd = 'pkg-config ' + ' '.join(args)
+        output = subprocess.check_output(cmd,
+                                         shell=True,
+                                         stderr=subprocess.STDOUT)
+        return output.decode().strip().split()
+    except subprocess.CalledProcessError as e:
+        print(str(e), file=sys.stderr)
+        sys.exit(1)
+
 setup(name='crypt4gh',
-      version='1.7',
+      version='1.8',
       url='https://www.github.com/EGA-archive/crypt4gh',
       license='Apache License 2.0',
       author='Frédéric Haziza',
@@ -28,7 +40,6 @@ setup(name='crypt4gh',
       platforms='any',
       classifiers=[  # Optional
           'Development Status :: 5 - Production/Stable',
-          'License :: OSI Approved :: Apache Software License',
 
           'Natural Language :: English',
           'Operating System :: MacOS :: MacOS X',
@@ -43,10 +54,6 @@ setup(name='crypt4gh',
           'Topic :: Security :: Cryptography',
           'Topic :: Scientific/Engineering :: Bio-Informatics',
 
-          'Programming Language :: Python :: 3.6',
-          'Programming Language :: Python :: 3.7',
-          'Programming Language :: Python :: 3.8',
-
           'Programming Language :: Python :: Implementation :: CPython',
       ],
       python_requires='>=3.6',
@@ -55,7 +62,14 @@ setup(name='crypt4gh',
           'pyYaml>=5.1.2',
           'docopt-ng', # include version when needed
           'cryptography>=2.8',
-          'pynacl>=1.3.0',
           'bcrypt', # include version when needed
+      ],
+      ext_modules=[
+          Extension('crypt4gh.sodium',
+                    sources=['crypt4gh/sodium.c'],
+                    description='Python C extension for libsodium used by Crypt4GH',
+                    extra_compile_args=pkg_config("--cflags", "libsodium"),
+                    extra_link_args=pkg_config("--libs", "libsodium"),
+                    )
       ],
 )

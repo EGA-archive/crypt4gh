@@ -53,5 +53,6 @@ LOG = logging.getLogger(__name__)
 VERSION = 1
 SEGMENT_SIZE = 65536
 
-
+CIPHER_DIFF = 28 # nonce: 12 + mac: 16 
+CIPHER_SEGMENT_SIZE = SEGMENT_SIZE + CIPHER_DIFF
 

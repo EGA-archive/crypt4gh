@@ -78,10 +78,6 @@ def main(argv=sys.argv[1:]):
         cb = partial(getpass, prompt=f'Passphrase for {args["<path>"]}: ')
         seckey = get_private_key(keypath, cb)
         LOG.info('Private Key: %s', seckey.hex().upper())
-
-        # from nacl.public import PrivateKey
-        # sk = PrivateKey(seckey)
-        # assert( pubkey == bytes(sk.public_key) )
         return
 
     raise ValueError('Should not come here')

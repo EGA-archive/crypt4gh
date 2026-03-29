@@ -33,6 +33,11 @@ jobs:
       run: |
         pip install . --no-cache-dir
 
+    - name: Install newer bash for macOS
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install bash
+
     - name: Install Bats
       run: |
         git clone https://github.com/bats-core/bats-core.git

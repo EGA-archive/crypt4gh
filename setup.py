@@ -50,12 +50,6 @@ class BuildLibsodium(build_ext):
             print("Skipping libsodium build (using system version).")
             return super().run()
 
-        # Force GCC on all platforms
-        if sys.platform == "win32":
-            self.compiler = "mingw32"  # or "gcc" if MinGW is set up
-        else:
-            self.compiler = "gcc"  # or "clang" on macOS
-
         # Configure and build libsodium
         cmd = ['./configure',
                '--prefix', str(LIBSODIUM_BUILD),

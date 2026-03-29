@@ -17,6 +17,8 @@ use_system_sodium = os.environ.get('SODIUM_INSTALL') == 'system'
 include_dirs=[]
 library_dirs=[]
 libraries=[]
+extra_compile_args = []
+extra_link_args = []
 
 if use_system_sodium:
     print("Using system-installed libsodium (CFLAGS and LDFLAGS may be needed).")
@@ -24,13 +26,22 @@ else:
     print("Bundling libsodium from libsodium-stable.")
     
     # Path to libsodium
-    LIBSODIUM = str(_here / 'libsodium-stable')
+    LIBSODIUM = _here / 'libsodium-stable'
     # Path to the built libsodium library
     LIBSODIUM_BUILD = _here / 'libsodium-build'
 
     include_dirs=[str(LIBSODIUM_BUILD / 'include')]
     library_dirs=[str(LIBSODIUM_BUILD / 'lib')]
-    libraries=['sodium']
+    #libraries=['sodium']
+    if sys.platform == "darwin":
+        extra_compile_args = ['-fPIC','-dead_strip']
+        extra_link_args = ['-fPIC','-dead_strip', '-Xlinker', '-dead_strip_dylibs']
+    else:
+        extra_compile_args = ['-fPIC', '-ffunction-sections', '-fdata-sections']
+        extra_link_args = ['-fPIC', '-Wl,--as-needed', '-Wl,--gc-sections']
+        # on linux, gc-sections is too conservative and keeps more than needed 
+        # the final C-extension will likely be bigger than needed: ¯\_(ツ)_/¯
+        # On macos, the linker is more aggressive and makes a smaller shared object
 
 class BuildLibsodium(build_ext):
     def run(self):
@@ -39,6 +50,12 @@ class BuildLibsodium(build_ext):
             print("Skipping libsodium build (using system version).")
             return super().run()
 
+        # Force GCC on all platforms
+        if sys.platform == "win32":
+            self.compiler = "mingw32"  # or "gcc" if MinGW is set up
+        else:
+            self.compiler = "gcc"  # or "clang" on macOS
+
         # Configure and build libsodium
         cmd = ['./configure',
                '--prefix', str(LIBSODIUM_BUILD),
@@ -46,10 +63,12 @@ class BuildLibsodium(build_ext):
                '--enable-opt', # since we install it on the machine
                '--disable-shared',
                '--enable-static',
+               '--enable-pic',
                ]
-        subprocess.check_call(cmd, cwd=LIBSODIUM)
+        if not (LIBSODIUM / 'config.status').exists():
+            subprocess.check_call(cmd, cwd=LIBSODIUM)
         subprocess.check_call(['make'], cwd=LIBSODIUM)
-        #subprocess.check_call(['make', 'check'], cwd=LIBSODIUM)
+        #subprocess.check_call(['make', 'check'], cwd=str(LIBSODIUM))
 
         # copy to LIBSODIUM_BUILD/{include,lib}
         # so it's easier in the Extension block
@@ -62,8 +81,13 @@ class CleanLibsodium(clean):
     def run(self):
         super().run()
 
-        print(f"Removing {LIBSODIUM_BUILD}")
+        print('Removing', LIBSODIUM_BUILD)
         shutil.rmtree(LIBSODIUM_BUILD, ignore_errors=True)
+
+        if (LIBSODIUM / 'Makefile').exists():
+            print('Cleaning up', LIBSODIUM)
+            subprocess.check_call(['make', 'distclean'], cwd=str(LIBSODIUM))
+
 
 
 setup(name='crypt4gh',
@@ -78,11 +102,7 @@ setup(name='crypt4gh',
       packages=find_packages(),
       include_package_data=True,
       package_data={
-          'crypt4gh': ['completions',
-                       'libs/*.dylib',
-                       'libs/*.so',
-                       'libs/*.dll',
-                       ],
+          'crypt4gh': ['completions'],
       },
       zip_safe=False,
       entry_points={
@@ -125,10 +145,12 @@ setup(name='crypt4gh',
       ext_modules=[
           Extension(
               'crypt4gh.sodium',
-              sources=['crypt4gh/sodium.c'],
-              include_dirs=include_dirs,
-              library_dirs=library_dirs,
-              libraries=libraries,
+              sources = ['crypt4gh/sodium.c'],
+              include_dirs = include_dirs,
+              library_dirs = library_dirs,
+              libraries = libraries,
+              extra_compile_args=extra_compile_args,
+              extra_link_args = extra_link_args
           )
       ],
 )

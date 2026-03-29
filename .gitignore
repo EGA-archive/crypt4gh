@@ -6,6 +6,10 @@ private/
 _build/
 logger*.yaml
 
+libsodium-build
+
+crypt4gh/sodium.*
+!crypt4gh/sodium.c
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

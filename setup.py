@@ -20,11 +20,7 @@ libraries=[]
 extra_compile_args = []
 extra_link_args = []
 
-if use_system_sodium:
-    print("Using system-installed libsodium (CFLAGS and LDFLAGS may be needed).")
-else:
-    print("Bundling libsodium from libsodium-stable.")
-    
+if not use_system_sodium:
     # Path to libsodium
     LIBSODIUM = _here / 'libsodium-stable'
     # Path to the built libsodium library
@@ -32,7 +28,7 @@ else:
 
     include_dirs=[str(LIBSODIUM_BUILD / 'include')]
     library_dirs=[str(LIBSODIUM_BUILD / 'lib')]
-    #libraries=['sodium']
+    libraries=['sodium']
     if sys.platform == "darwin":
         extra_compile_args = ['-fPIC','-dead_strip']
         extra_link_args = ['-fPIC','-dead_strip', '-Xlinker', '-dead_strip_dylibs']
@@ -47,9 +43,13 @@ class BuildLibsodium(build_ext):
     def run(self):
 
         if use_system_sodium:
-            print("Skipping libsodium build (using system version).")
+            print('''\
+Skipping build, using system-installed libsodium.
+CFLAGS and LDFLAGS may be needed.
+''')
             return super().run()
 
+        print("Bundling libsodium from libsodium-stable.")
         # Configure and build libsodium
         cmd = ['./configure',
                '--prefix', str(LIBSODIUM_BUILD),

@@ -80,7 +80,11 @@ jobs:
       run: |
         export SODIUM_INSTALL=system
         export CFLAGS="$(pkg-config --cflags libsodium)"
-        export LDFLAGS="-Wl,--no-as-needed $(pkg-config --libs libsodium)"
+        if [ "$RUNNER_OS" = "Linux" ]; then
+            export LDFLAGS="-Wl,--no-as-needed $(pkg-config --libs libsodium)"
+        else
+            export LDFLAGS="$(pkg-config --libs libsodium)"
+        fi
         pip install . --no-cache-dir
 
     - name: Install Bats

@@ -30,41 +30,8 @@ jobs:
         pip install -r requirements.txt
 
     - name: Install package
-      run: pip install .
-
-    - name: Save Python environment
       run: |
-        tar -czf python-env-${{ matrix.os }}.tar.gz -C $(python -c 'import site; print(site.getsitepackages()[0])') .
-    - name: Upload environment artifact
-      uses: actions/upload-artifact@v6
-      with:
-        name: python-env-${{ matrix.os }}
-        path: python-env-${{ matrix.os }}.tar.gz
-
-  tests:
-    needs: build
-    runs-on: ${{ matrix.os }}
-    strategy:
-      max-parallel: 6
-      matrix:
-        os: [macos-latest, ubuntu-latest]
-        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
-
-    steps:
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v6
-      with:
-        python-version: ${{ matrix.python-version }}
-
-    - name: Download Python environment artifact
-      uses: actions/download-artifact@v6
-      with:
-        name: python-env-${{ matrix.os }}
-        path: /tmp
-
-    - name: Restore Python environment
-      run: |
-        tar -xzf /tmp/python-env-${{ matrix.os }}.tar.gz -C $(python -c 'import site; print(site.getsitepackages()[0])')
+        pip install . --no-cache-dir
 
     - name: Install Bats
       run: |
@@ -75,3 +42,52 @@ jobs:
       run: |
         bats tests
 
+
+  build-system:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      max-parallel: 6
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
+
+    steps:
+    - name: Checkout repository (without libsodium submodule)
+      uses: actions/checkout@v6
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Install pkg-config and libsodium (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install pkg-config libsodium
+
+    - name: Install pkg-config and libsodium (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pkg-config libsodium-dev
+
+    - name: Install package with system-wide libsodium
+      run: |
+        export SODIUM_INSTALL=system
+        export CFLAGS="$(pkg-config --cflags libsodium)"
+        export LDFLAGS="-Wl,--no-as-needed $(pkg-config --libs libsodium)"
+        pip install . --no-cache-dir
+
+    - name: Install Bats
+      run: |
+        git clone https://github.com/bats-core/bats-core.git
+        pushd bats-core && git checkout v1.1.0 && sudo ./install.sh /usr/local && popd
+
+    - name: Run bats tests
+      run: |
+        bats tests

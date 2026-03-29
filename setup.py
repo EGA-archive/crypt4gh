@@ -75,6 +75,9 @@ class CleanLibsodium(clean):
     def run(self):
         super().run()
 
+        if use_system_sodium:
+            return
+
         print('Removing', LIBSODIUM_BUILD)
         shutil.rmtree(LIBSODIUM_BUILD, ignore_errors=True)
 

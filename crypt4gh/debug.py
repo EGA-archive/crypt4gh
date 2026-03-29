@@ -4,10 +4,11 @@
 import sys
 import os
 import logging
-import logging.config
+from logging.config import dictConfig
 from functools import partial
 from getpass import getpass
 #import traceback
+import json
 
 from docopt import docopt
 
@@ -56,16 +57,12 @@ def parse_args(argv=sys.argv[1:]):
     version = f'{__title__} (version {__version__})'
     args = docopt(__doc__, argv, version=version)
 
-    # if args['version']: print(version); sys.exit(0)
-    # if args['help']: print(__doc__.strip()); sys.exit(0)
-
     # Logging
     logger = args['--log'] or DEFAULT_LOG
-    logging.basicConfig(stream=sys.stderr, level=logging.CRITICAL) # for the root logger
+    logging.basicConfig(stream=sys.stderr, level=logging.DEBUG) # for the root logger
     if logger and os.path.exists(logger):
         with open(logger, 'rt') as stream:
-            import yaml
-            logging.config.dictConfig(yaml.safe_load(stream))
+            dictConfig(json.load(stream))
 
     # I prefer to clean up
     for s in ['--log', '--help', '--version']:#, 'help', 'version']:

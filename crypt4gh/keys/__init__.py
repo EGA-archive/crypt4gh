@@ -6,10 +6,11 @@ import sys
 import os
 import io
 import logging
-import logging.config
+from logging.config import dictConfig
 from base64 import b64decode, b64encode
 from functools import partial
 from getpass import getpass
+import json
 
 from docopt import docopt
 
@@ -146,8 +147,7 @@ def run(argv=sys.argv[1:]):
     logger = args['--log'] or DEFAULT_LOG
     if logger and os.path.exists(logger):
         with open(logger, 'rt') as stream:
-            import yaml
-            logging.config.dictConfig(yaml.safe_load(stream))
+            dictConfig(json.load(stream))
 
     # I prefer to clean up
     for s in ['--log', '--help', '--version']:#, 'help', 'version']:

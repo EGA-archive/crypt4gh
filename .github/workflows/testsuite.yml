@@ -5,11 +5,12 @@ on: [push]
 jobs:
 
   build:
-    runs-on: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
 
     strategy:
       max-parallel: 6
       matrix:
+        os: [macos-latest, ubuntu-latest]
         python-version: ['3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
 
     steps:
@@ -33,20 +34,20 @@ jobs:
 
     - name: Save Python environment
       run: |
-        tar -czf python-env.tar.gz -C $(python -c 'import site; print(site.getsitepackages()[0])') .
+        tar -czf python-env-${{ matrix.os }}.tar.gz -C $(python -c 'import site; print(site.getsitepackages()[0])') .
     - name: Upload environment artifact
       uses: actions/upload-artifact@v6
       with:
-        name: python-env
-        path: python-env.tar.gz
-
+        name: python-env-${{ matrix.os }}
+        path: python-env-${{ matrix.os }}.tar.gz
 
   tests:
     needs: build
-    runs-on: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
     strategy:
       max-parallel: 6
       matrix:
+        os: [macos-latest, ubuntu-latest]
         python-version: ['3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
 
     steps:
@@ -55,9 +56,15 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
+    - name: Download Python environment artifact
+      uses: actions/download-artifact@v6
+      with:
+        name: python-env-${{ matrix.os }}
+        path: /tmp
+
     - name: Restore Python environment
       run: |
-        tar -xzf /tmp/python-env/python-env.tar.gz -C $(python -c 'import site; print(site.getsitepackages()[0])')
+        tar -xzf /tmp/python-env-${{ matrix.os }}.tar.gz -C $(python -c 'import site; print(site.getsitepackages()[0])')
 
     - name: Install Bats
       run: |

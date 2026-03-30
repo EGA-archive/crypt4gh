@@ -51,8 +51,8 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y pkg-config libsodium-dev
         export SODIUM_INSTALL=system
+        export CFLAGS="$(pkg-config --cflags libsodium)"
         export LDFLAGS="-Wl,--no-as-needed $(pkg-config --libs libsodium)"
-        export LDFLAGS="$(pkg-config --libs libsodium)"
         pip install . --no-cache-dir
 
     - name: Install package (bundled)

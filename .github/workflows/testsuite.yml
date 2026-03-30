@@ -48,8 +48,8 @@ jobs:
     - name: Install Crypt4GH with system-wide libsodium (Ubuntu)
       if: matrix.os == 'ubuntu-latest' && matrix.install == 'system'
       run: |
-        apt-get update
-        apt-get install -y pkg-config libsodium-dev
+        sudo apt-get update
+        sudo apt-get install -y pkg-config libsodium-dev
         export SODIUM_INSTALL=system
         export LDFLAGS="-Wl,--no-as-needed $(pkg-config --libs libsodium)"
         export LDFLAGS="$(pkg-config --libs libsodium)"
@@ -68,7 +68,7 @@ jobs:
     - name: Install bats (Ubuntu)
       if: matrix.os == 'ubuntu-latest'
       run: |
-        apt-get install -y bats
+        sudo apt-get install -y bats
 
     - name: Run tests
       run: |

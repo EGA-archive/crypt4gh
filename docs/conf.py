@@ -3,8 +3,6 @@
 #
 import os
 import sys
-import datetime
-from unittest.mock import MagicMock
 
 # Get the project root dir, which is the parent dir of this
 #sys.path.insert(0, os.path.dirname(os.getcwd()))
@@ -36,19 +34,18 @@ templates_path = ['templates']
 
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
-#
-# source_suffix = ['.rst', '.md']
-source_suffix = '.rst'
+source_suffix = {
+    '.rst': 'restructuredtext',
+    #'.txt': 'restructuredtext',
+    #'.md': 'markdown',
+}
 
 # The master toctree document.
-master_doc = 'index'
-
-# Get current year
-current_year = str(datetime.date.today().year)
+#master_doc = 'index'
 
 # General information about the project.
 project = 'Crypt4GH'
-copyright = f'{current_year}, EGA-CRG System Developers'
+copyright = '%Y, EGA-CRG System Developers'
 author = crypt4gh.__author__
 
 # The version info for the project you're documenting, acts as replacement for
@@ -65,12 +62,15 @@ release = str(crypt4gh.__version__)
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = 'en'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This patterns also effect to html_static_path and html_extra_path
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+exclude_patterns = ['_build',
+                    'Thumbs.db',
+                    '.DS_Store',
+                    '__docs__']
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
@@ -83,7 +83,7 @@ autosummary_generate = True
 
 # -- Options for HTML output ----------------------------------------------
 
-html_title = 'GA4GH cryptor'
+html_title = 'GA4GH crypt4gh'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
@@ -98,11 +98,35 @@ html_title = 'GA4GH cryptor'
 # }
 
 html_theme = 'sphinx_rtd_theme'
+
+html_css_files = [
+    'custom.css',
+    #'https://example.com/css/custom.css',
+    #('print.css', {'media': 'print'}),
+]
+
+smartquotes = True
+
+# html_theme_options = {
+#     'collapse_navigation': True,
+#     'sticky_navigation': True,
+#     'prev_next_buttons_location': 'bottom',
+# }
+
 html_theme_options = {
+    'logo_only': False,
+    # 'style_external_links': False,
+    # 'vcs_pageview_mode': '',
+    # 'style_nav_header_background': 'white',
+    # 'flyout_display': 'hidden',
+    'version_selector': True,
+    'language_selector': False,
+    # Toc options
     'collapse_navigation': True,
     'sticky_navigation': True,
     #'navigation_depth': 4,
-    'display_version': True,
+    #'includehidden': True,
+    'titles_only': False,
     'prev_next_buttons_location': 'bottom',
 }
 
@@ -126,15 +150,8 @@ html_sidebars = {
     ]
 }
 
-
 today_fmt = '%B %d, %Y'
 
-def setup(app):
-    app.add_css_file('custom.css')
 
 # -- Other stuff ----------------------------------------------------------
 htmlhelp_basename = 'crypt4gh'
-latex_elements = {}
-latex_documents = [ (master_doc, 'crypt4gh.tex', 'GA4GH cryptor', 'EGA-CRG System Developers', 'manual') ]
-man_pages = [ (master_doc, 'crypt4gh', 'GA4GH cryptor', [author], 1) ]
-texinfo_documents = [ (master_doc, 'crypt4gh', 'GA4GH cryptor', author, 'GA4GH cryptor', 'GA4GH cryptographic tools', 'Miscellaneous') ]

@@ -56,8 +56,8 @@ For that, you set the following environment variables before running ``pip insta
 
 ----
 
-Tests
-=====
+Testsuite
+=========
 
 You can run a few tests after installation.
 We provide a testsuite simulating, for example, that Bob encrypts a randomly-generated file for Alice and Alice decrypts it.

@@ -84,7 +84,7 @@ class CleanLibsodium(clean):
 
         if (LIBSODIUM / 'Makefile').exists():
             print('Cleaning up', LIBSODIUM)
-            subprocess.check_call(['make', 'distclean'], cwd=str(LIBSODIUM))
+            subprocess.check_call(['make', 'clean'], cwd=str(LIBSODIUM))
 
 
 

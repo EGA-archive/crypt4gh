@@ -19,8 +19,6 @@ pip install crypt4gh
 or [compile and install it from the latest sources](#compilation-from-sources)
 
 
-See [notes on compilation](#compilation)
-
 ## Usage
 
 The usual `-h` flag shows you the different options that the tool accepts.

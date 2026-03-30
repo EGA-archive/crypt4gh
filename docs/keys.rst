@@ -1,6 +1,8 @@
-.. note:: This utility supports OpenSSH key-format (version 6.5 or above)
-	  if the key was generated with type ``ed25519`` (ie with ``ssh-keygen -t ed25519 ...``).
-	  Otherwise, this utility can generate keys in the following format...
+.. note::
+
+   This utility supports OpenSSH key-format (version 6.5 or above) if the key was generated with type ``ed25519`` (ie with ``ssh-keygen -t ed25519 ...``).
+
+   Otherwise, this utility can generate keys in the following format...
 
 
 Crypt4GH Key Format

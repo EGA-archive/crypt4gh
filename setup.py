@@ -1,6 +1,7 @@
 import sys
+assert sys.version_info >= (3, 6), "crypt4gh requires python 3.6 or higher"
+
 import os
-assert sys.version_info >= (3, 9), "crypt4gh requires python 3.9 or higher"
 import subprocess
 from pathlib import Path
 import shutil
@@ -92,7 +93,7 @@ setup(name='crypt4gh',
       url='https://www.github.com/EGA-archive/crypt4gh',
       license='Apache License 2.0',
       author='Frédéric Haziza',
-      author_email='frederic.haziza@crg.eu',
+      author_email='silverdaz@gmail.com',
       description='GA4GH cryptographic utilities',
       long_description=(_here / 'README.md').read_text(),
       long_description_content_type='text/markdown',
@@ -127,7 +128,7 @@ setup(name='crypt4gh',
 
           'Programming Language :: Python :: Implementation :: CPython',
       ],
-      python_requires='>=3.9',
+      python_requires='>=3.6',
       # See https://packaging.python.org/discussions/install-requires-vs-requirements/
       install_requires=[
           'docopt-ng', # include version when needed

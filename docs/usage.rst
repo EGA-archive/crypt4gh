@@ -72,11 +72,11 @@ Any user can generate a keypair with:
 The private key will be encrypted with a passphrase. The user is prompted at the terminal for that passphrase.
 
 Storing the encrypted header separately
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+---------------------------------------
 
-The encrypted header can be stored separately from the encrypted payload. Splitting header from payload is useful when payloads are stored in a shared location, for example. In this case, only the header needs to be re-encrypted (for a specific recipient) while the encrypted payloads remains untouched.
+The encrypted header can be stored separately from the encrypted payload. Splitting header from payload is useful when payloads are stored in a shared location, for example. In this case, only the header needs to be re-encrypted (for a specific recipient) while the encrypted payload remains untouched.
 
-To store the encrypted header in a separate file ``header.bob.c4gh``, use the flag ``--header``. Alice sends a message to Bob, sharing the message payload (and herself).
+To store the encrypted header in a separate file ``header.bob.c4gh``, use the flag ``--header``. Alice sends a message to Bob (and herself), sharing the message payload.
 
 .. code-block:: console
 

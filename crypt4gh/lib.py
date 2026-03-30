@@ -68,8 +68,7 @@ def encrypt(keys, infile, outfile, headerfile=None, offset=0, span=None):
 
     # Preparing the encryption engine
     encryption_method = 0 # only choice for this version
-    #session_key = os.urandom(32) # we use one session key for all blocks
-    session_key = bytes.fromhex('0d4ee5bab2de9a3b250b2e7a96fd3e519ed4979113a00abc2a9b4cd557e6dab6')
+    session_key = os.urandom(32) # we use one session key for all blocks
     LOG.debug("Session key: %s", session_key.hex())
 
     # Output the header

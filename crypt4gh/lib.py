@@ -196,9 +196,9 @@ def body_decrypt(infile, session_keys, output, offset):
     try:
         segment = bytearray(SEGMENT_SIZE)
         for ciphersegment in cipher_chunker(infile, CIPHER_SEGMENT_SIZE):
-            LOG.debug("Ciphersegment [%d]: %s", len(ciphersegment), ciphersegment.hex())
+            #LOG.debug("Ciphersegment [%d]: %s", len(ciphersegment), ciphersegment.hex())
             plen = decrypt_block(segment, ciphersegment, session_keys)
-            LOG.debug("Segment [%d]: %s", plen, segment[:plen].hex())
+            #LOG.debug("Segment [%d]: %s", plen, segment[:plen].hex())
             output.send(segment[:plen])
     except ProcessingOver:  # output raised it
         pass

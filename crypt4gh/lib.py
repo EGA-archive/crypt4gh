@@ -113,16 +113,6 @@ def encrypt(keys, infile, outfile, headerfile=None, offset=0, span=None):
 #
 ##############################################################
 
-def cipher_chunker(f, size):
-    while True:
-        ciphersegment = f.read(size)
-        ciphersegment_len = len(ciphersegment)
-        if ciphersegment_len == 0: 
-            break # We were at the last segment. Exits the loop
-        assert( ciphersegment_len > CIPHER_DIFF )
-        yield ciphersegment
-
-
 def decrypt_block(segment, ciphersegment, session_keys):
     # Trying the different session keys
     # Note: we could order them and if one fails, we move it at the end of the list
@@ -195,11 +185,17 @@ def body_decrypt(infile, session_keys, output, offset):
 
     try:
         segment = bytearray(SEGMENT_SIZE)
-        for ciphersegment in cipher_chunker(infile, CIPHER_SEGMENT_SIZE):
-            #LOG.debug("Ciphersegment [%d]: %s", len(ciphersegment), ciphersegment.hex())
-            plen = decrypt_block(segment, ciphersegment, session_keys)
-            #LOG.debug("Segment [%d]: %s", plen, segment[:plen].hex())
+        ciphersegment = bytearray(CIPHER_SEGMENT_SIZE)
+
+        while True:
+            ciphersegment_len = infile.readinto(ciphersegment)
+            if ciphersegment_len == 0: 
+                break # We were at the last segment. Exits the loop
+            assert( ciphersegment_len > CIPHER_DIFF )
+
+            plen = decrypt_block(segment, ciphersegment[:ciphersegment_len], session_keys)
             output.send(segment[:plen])
+
     except ProcessingOver:  # output raised it
         pass
 

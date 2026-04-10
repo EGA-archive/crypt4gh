@@ -1,5 +1,5 @@
 import sys
-assert sys.version_info >= (3, 6), "crypt4gh requires python 3.6 or higher"
+assert sys.version_info >= (3, 6), "setup.py requires python 3.6 or higher"
 
 import os
 import subprocess

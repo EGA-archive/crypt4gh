@@ -13,9 +13,13 @@ or compile/install it from sources:
 
 .. code-block:: console
 
-    git clone --recursive https://github.com/EGA-archive/crypt4gh
-    pip install -r crypt4gh/requirements.txt
-    pip install ./crypt4gh
+   git clone --recursive https://github.com/EGA-archive/crypt4gh
+   pip install -r crypt4gh/requirements.txt
+   pip install ./crypt4gh
+   #
+   # or just
+   #
+   pip install git+https://github.com/EGA-archive/crypt4gh.git
 
 
 The above will use a version of `libsodium`_ bundled in the repository as a submodule (hence cloning with ``--recursive``).

@@ -3,16 +3,16 @@
 import sys
 import os
 import logging
-import logging.config
+from logging.config import dictConfig
 from functools import partial
 from getpass import getpass
 import re
+import json
 
 from docopt import docopt
-from nacl.public import PrivateKey
 
 from . import __title__, __version__, PROG
-from . import lib
+from . import lib, sodium
 from .keys import get_public_key, get_private_key
 
 LOG = logging.getLogger(__name__)
@@ -60,19 +60,15 @@ def parse_args(argv=sys.argv[1:]):
     version = f'{__title__} (version {__version__})'
     args = docopt(__doc__, argv, version=version)
 
-    # if args['version']: print(version); sys.exit(0)
-    # if args['help']: print(__doc__.strip()); sys.exit(0)
-
-    # Logging
-    logger = args['--log'] or DEFAULT_LOG
-    # for the root logger
+    # Logging for the root logger
     logging.basicConfig(stream=sys.stderr,
                         level=logging.DEBUG if C4GH_DEBUG else logging.CRITICAL,
                         format='[%(levelname)s] %(message)s')
+
+    logger = args['--log'] or DEFAULT_LOG
     if logger and os.path.exists(logger):
         with open(logger, 'rt') as stream:
-            import yaml
-            logging.config.dictConfig(yaml.safe_load(stream))
+            dictConfig(json.load(stream))
 
     # I prefer to clean up
     for s in ['--log', '--help', '--version']:#, 'help', 'version']:
@@ -105,8 +101,7 @@ def retrieve_private_key(args, generate=False):
     seckey = args['--sk'] or DEFAULT_SK
 
     if generate and seckey is None: # generate a one on the fly
-        sk = PrivateKey.generate()
-        skey = bytes(sk)
+        skey = os.urandom(32)
         LOG.debug('Generating Private Key: %s', skey.hex().upper())
         return skey
 
@@ -188,8 +183,9 @@ def rearrange(args):
     range_start, range_span = parse_range(args)
 
     seckey = retrieve_private_key(args)
+    pubkey = sodium.derive_pk(seckey)
 
-    keys = [(0, seckey, bytes(PrivateKey(seckey).public_key))] # keys = list of (method, privkey, recipient_pubkey=ourselves)
+    keys = [(0, seckey, pubkey)] # keys = list of (method, privkey, recipient_pubkey=ourselves)
 
     lib.rearrange(keys,
                   sys.stdin.buffer,

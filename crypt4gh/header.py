@@ -6,14 +6,7 @@ import logging
 from itertools import chain
 # from types import GeneratorType
 
-from nacl.bindings import (crypto_kx_client_session_keys,
-                           crypto_kx_server_session_keys,
-                           crypto_aead_chacha20poly1305_ietf_encrypt,
-                           crypto_aead_chacha20poly1305_ietf_decrypt)
-from nacl.exceptions import CryptoError
-from nacl.public import PrivateKey
-
-from . import SEGMENT_SIZE, VERSION
+from . import sodium, SEGMENT_SIZE, VERSION, CIPHER_DIFF
 
 LOG = logging.getLogger(__name__)
 
@@ -171,7 +164,7 @@ def parse_edit_list_packet(packet):
 def encrypt_X25519_Chacha20_Poly1305(data, seckey, recipient_pubkey):
     '''Computes the encrypted part'''
 
-    pubkey = bytes(PrivateKey(seckey).public_key)
+    pubkey = sodium.derive_pk(seckey)
 
     #LOG.debug('Original data: %s', data.hex())
     LOG.debug("         Packet data: %s", data.hex())
@@ -180,13 +173,14 @@ def encrypt_X25519_Chacha20_Poly1305(data, seckey, recipient_pubkey):
     LOG.debug('recipient public key: %s', recipient_pubkey.hex())
 
     # X25519 shared key
-    _, shared_key = crypto_kx_server_session_keys(pubkey, seckey, recipient_pubkey)
+    shared_key = sodium.kx_server(pubkey, seckey, recipient_pubkey)
     LOG.debug('shared key: %s', shared_key.hex())
 
-    # Chacha20_Poly1305
-    nonce = os.urandom(12)
-    encrypted_data = crypto_aead_chacha20poly1305_ietf_encrypt(data, None, nonce, shared_key)  # no add
-    return (pubkey + nonce + encrypted_data)
+    encrypted_data = bytearray(len(data) + CIPHER_DIFF)
+
+    # Chacha20_Poly1305 (including nonce)
+    clen = sodium.chacha20poly1305_encrypt(encrypted_data, data, shared_key)
+    return pubkey + encrypted_data[:clen]
 
 def decrypt_X25519_Chacha20_Poly1305(encrypted_part, privkey, sender_pubkey=None):
     #LOG.debug('-----------  Encrypted data: %s', encrypted_part.hex())
@@ -205,12 +199,13 @@ def decrypt_X25519_Chacha20_Poly1305(encrypted_part, privkey, sender_pubkey=None
     LOG.debug('encrypted data: %s', packet_data.hex())
 
     # X25519 shared key
-    pubkey = bytes(PrivateKey(privkey).public_key)  # slightly inefficient, but working
-    shared_key, _ = crypto_kx_client_session_keys(pubkey, privkey, peer_pubkey)
+    pubkey = sodium.derive_pk(privkey)
+    shared_key = sodium.kx_client(pubkey, privkey, peer_pubkey)
     LOG.debug('shared key: %s', shared_key.hex())
 
-    # Chacha20_Poly1305
-    return crypto_aead_chacha20poly1305_ietf_decrypt(packet_data, None, nonce, shared_key)  # no add
+    decrypted_data = bytearray(len(packet_data)) # larger then needed
+    plen = sodium.chacha20poly1305_decrypt(decrypted_data, encrypted_part[32:], shared_key)
+    return decrypted_data[:plen]
 
 
 def decrypt_packet(packet, keys, sender_pubkey=None):
@@ -232,10 +227,8 @@ def decrypt_packet(packet, keys, sender_pubkey=None):
             try:
                 privkey, _ = key # must fit
                 return decrypt_X25519_Chacha20_Poly1305(packet[4:], privkey, sender_pubkey=sender_pubkey)
-            except CryptoError as tag:
-                LOG.error('Packet Decryption failed: %s', tag)
-            except Exception as e: # Any other error, like (IndexError, TypeError, ValueError)
-                LOG.error('Not a X25519 key: ignoring | %s', e)
+            except Exception as e:
+                LOG.error('X25519 Packet Decryption failed: %s', e)
                 # try the next one
 
         elif packet_encryption_method == 1:

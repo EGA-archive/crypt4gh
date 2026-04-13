@@ -37,9 +37,9 @@ cryptographic file format."""
 
 
 __title__ = 'GA4GH cryptographic utilities'
-__version__ = '1.7' # VERSION in header is 1 (as 4 bytes little endian)
+__version__ = '1.8' # VERSION in header is 1 (as 4 bytes little endian)
 __author__ = 'Frédéric Haziza'
-__author_email__ = 'frederic.haziza@crg.eu'
+__author_email__ = 'silverdaz@gmail.com'
 __license__ = 'Apache License 2.0'
 __copyright__ = __title__ + ' @ CRG'
 
@@ -53,5 +53,6 @@ LOG = logging.getLogger(__name__)
 VERSION = 1
 SEGMENT_SIZE = 65536
 
-
+CIPHER_DIFF = 28 # nonce: 12 + mac: 16 
+CIPHER_SEGMENT_SIZE = SEGMENT_SIZE + CIPHER_DIFF
 

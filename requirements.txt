@@ -1,5 +1,4 @@
-pyYaml
 docopt-ng
 cryptography
-pynacl
 bcrypt
+setuptools

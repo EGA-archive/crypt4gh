@@ -4,9 +4,8 @@ import io
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import algorithms, Cipher, modes
-from nacl.exceptions import CryptoError
-from nacl.bindings.crypto_sign import crypto_sign_ed25519_pk_to_curve25519, crypto_sign_ed25519_sk_to_curve25519
 
+from .. import sodium
 from .kdf import derive_key
 from ..exceptions import exit_on_invalid_passphrase
 
@@ -52,7 +51,7 @@ def get_cipher(ciphername, derived_key):
     key = derived_key[:keylen]
     iv = derived_key[keylen:]
 
-    LOG.debug('Decryptiong Key (%d): %s', len(key), key.hex().upper())
+    LOG.debug('Decryption Key (%d): %s', len(key), key.hex().upper())
     LOG.debug('IV (%d): %s', len(iv), iv.hex().upper())
 
     backend = default_backend()
@@ -89,7 +88,7 @@ def _get_skpk_from_decrypted_private_blob(blob):
     checkint2 = blob.read(4)
     if checkint1 != checkint2:
         LOG.error('Check: %s != %s', checkint1, checkint2)
-        raise CryptoError()
+        raise ValueError()
 
     # We should parse n keys, but n is 1
     decode_string(blob) # ignore key name
@@ -104,10 +103,10 @@ def _get_skpk_from_decrypted_private_blob(blob):
     pk = skpk[32:] # second half = pub key
     LOG.debug('ed25519 pk: %s', pk.hex().upper())
 
-    seckey = crypto_sign_ed25519_sk_to_curve25519(skpk)
+    seckey = sodium.sign_ed25519_sk_to_curve25519(skpk)
     LOG.debug('x25519 sk: %s', seckey.hex().upper())
 
-    pubkey = crypto_sign_ed25519_pk_to_curve25519(pk)
+    pubkey = sodium.sign_ed25519_pk_to_curve25519(pk)
     LOG.debug('x25519 pk: %s', pubkey.hex().upper())
 
     return (seckey, pubkey)
@@ -169,7 +168,7 @@ def parse_private_key(stream, callback):
     dklen = get_derived_key_length(ciphername) # key length + IV length
     LOG.debug('Derived Key len: %d', dklen)
     derived_key = derive_key(kdfname, passphrase, salt, rounds, dklen=dklen) 
-    LOG.debug('Derived Key: %s', derived_key)
+    LOG.debug('Derived Key: %s', derived_key.hex())
     decryptor = get_cipher(ciphername, derived_key).decryptor()
     assert( len(private_ciphertext) % _block_size(ciphername) == 0 ), "Invalid cipher block length"
     private_data = decryptor.update(private_ciphertext) + decryptor.finalize()
@@ -191,4 +190,4 @@ def get_public_key(line):
     assert( key_type == b'ssh-ed25519' )
     pubkey_bytes = decode_string(stream) # the rest is the ED25519 public key: it should be 32 bytes
     # Converting
-    return crypto_sign_ed25519_pk_to_curve25519(pubkey_bytes)
+    return sodium.sign_ed25519_pk_to_curve25519(pubkey_bytes)

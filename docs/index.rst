@@ -41,26 +41,26 @@ Alice decrypts the encrypted file:
    :alt: Demo
 
 
-Table of Contents
-=================
-
 .. toctree::
    :maxdepth: 1
    :name: toc
+   :hidden:
 
    Installation         <setup>
    Encryption           <encryption>
    Key Format           <keys>
    Usage & Examples     <usage>
+   Examples             <examples>
    Python Modules       <code>
 
 
-|Travis| | Version |version| | Generated |today|
+|build| |version|, generated |today|
 
 
-.. |Travis| image:: https://travis-ci.org/EGA-archive/crypt4gh.svg?branch=master
+.. |build| image:: https://github.com/EGA-archive/crypt4gh/workflows/Testsuite/badge.svg
 	:alt: Build Status
 	:class: inline-baseline
+	:target: https://github.com/EGA-archive/crypt4gh/actions	
 
 .. |moreabout| unicode:: U+261E .. right pointing finger
 .. |connect| unicode:: U+21cc .. <-_>

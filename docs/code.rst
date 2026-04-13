@@ -8,9 +8,9 @@ Python Modules
 
 .. autosummary::
 
-    crypt4gh.lib
-    crypt4gh.header
-    crypt4gh.keys
+    lib
+    header
+    keys
 
 ----
 

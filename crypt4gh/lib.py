@@ -6,19 +6,14 @@ import logging
 import io
 import collections
 
-from nacl.bindings import (crypto_aead_chacha20poly1305_ietf_encrypt,
-                           crypto_aead_chacha20poly1305_ietf_decrypt)
-from nacl.exceptions import CryptoError
-
-
-from . import SEGMENT_SIZE
+from . import SEGMENT_SIZE, CIPHER_DIFF, CIPHER_SEGMENT_SIZE
 from .exceptions import close_on_broken_pipe
 from . import header
 
+from . import sodium
+
 LOG = logging.getLogger(__name__)
 
-CIPHER_DIFF = 28
-CIPHER_SEGMENT_SIZE = SEGMENT_SIZE + CIPHER_DIFF
 
 # Encryption Methods Conventions
 # ------------------------------
@@ -34,18 +29,7 @@ CIPHER_SEGMENT_SIZE = SEGMENT_SIZE + CIPHER_DIFF
 ##
 ##############################################################
 
-def _encrypt_segment(data, process, key):
-    '''Utility function to generate a nonce, encrypt data with Chacha20, and authenticate it with Poly1305.'''
-
-    #LOG.debug("Segment [%d bytes]: %s..%s", len(data), data[:10], data[-10:])
-
-    nonce = os.urandom(12)
-    encrypted_data = crypto_aead_chacha20poly1305_ietf_encrypt(data, None, nonce, key)  # no add
-    process(nonce) # after producing the segment, so we don't start outputing when an error occurs
-    process(encrypted_data)
-
-
-@close_on_broken_pipe
+#@close_on_broken_pipe
 def encrypt(keys, infile, outfile, headerfile=None, offset=0, span=None):
     '''Encrypt infile into outfile, using the list of keys.
 
@@ -85,6 +69,7 @@ def encrypt(keys, infile, outfile, headerfile=None, offset=0, span=None):
     # Preparing the encryption engine
     encryption_method = 0 # only choice for this version
     session_key = os.urandom(32) # we use one session key for all blocks
+    LOG.debug("Session key: %s", session_key.hex())
 
     # Output the header
     LOG.debug('Creating Crypt4GH header')
@@ -97,49 +82,27 @@ def encrypt(keys, infile, outfile, headerfile=None, offset=0, span=None):
 
     # ...and cue music
     LOG.debug("Streaming content")
-    # oh boy... I buffer a whole segment!
-    # TODO: Use a smaller buffer (Requires code rewrite)
+
     segment = bytearray(SEGMENT_SIZE)
+    ciphersegment = bytearray(CIPHER_SEGMENT_SIZE)
 
-    if span is None:
-        # The whole file
-        while True:
-            segment_len = infile.readinto(segment)
+    while span is None or span > 0:
 
-            if segment_len == 0: # finito
-                break
+        segment_len = infile.readinto(segment)
+        if segment_len == 0: # finito
+            break
 
-            if segment_len < SEGMENT_SIZE: # not a full segment
-                data = bytes(segment[:segment_len]) # to discard the bytes from the previous segments
-                _encrypt_segment(data, outfile.write, session_key)
-                break
+        dlen = min(span, segment_len) if span else segment_len
+        clen = sodium.chacha20poly1305_encrypt(ciphersegment, segment[:dlen], session_key)
+        outfile.write(ciphersegment[:clen])
 
-            data = bytes(segment) # this is a full segment
-            _encrypt_segment(data, outfile.write, session_key)
-
-    else: # we have a max size
-        assert( span )
-
-        while span > 0:
-
-            segment_len = infile.readinto(segment)
-
-            data = bytes(segment) # this is a full segment
-
-            if segment_len < SEGMENT_SIZE: # not a full segment
-                data = data[:segment_len] # to discard the bytes from the previous segments
-
+        if span is not None:
             if span < segment_len: # stop early
-                data = data[:span]
-                _encrypt_segment(data, outfile.write, session_key)
                 break
-
-            _encrypt_segment(data, outfile.write, session_key)
-
             span -= segment_len
 
-            if segment_len < SEGMENT_SIZE: # not a full segment
-                break
+        if dlen < SEGMENT_SIZE: # not a full segment
+            break
 
     LOG.info('Encryption Successful')
 
@@ -147,30 +110,18 @@ def encrypt(keys, infile, outfile, headerfile=None, offset=0, span=None):
 ##############################################################
 ##
 ##    Symmetric decryption - Chacha20_Poly1305
-##
+#
 ##############################################################
 
-def cipher_chunker(f, size):
-    while True:
-        ciphersegment = f.read(size)
-        ciphersegment_len = len(ciphersegment)
-        if ciphersegment_len == 0: 
-            break # We were at the last segment. Exits the loop
-        assert( ciphersegment_len > CIPHER_DIFF )
-        yield ciphersegment
-
-def decrypt_block(ciphersegment, session_keys):
-    # Trying the different session keys (via the cipher objects)
+def decrypt_block(segment, ciphersegment, session_keys):
+    # Trying the different session keys
     # Note: we could order them and if one fails, we move it at the end of the list
     # So... LRU solution. For now, try them as they come.
-    nonce = ciphersegment[:12]
-    data = ciphersegment[12:]
-
     for key in session_keys:
         try:
-            return crypto_aead_chacha20poly1305_ietf_decrypt(data, None, nonce, key)  # no add, and break the loop
-        except CryptoError as tag:
-            LOG.error('Decryption failed: %s', tag)
+            return sodium.chacha20poly1305_decrypt(segment, ciphersegment, key)
+        except Exception as e:
+            LOG.error('Decryption failed: %s', e)
     else: # no cipher worked: Bark!
         raise ValueError('Could not decrypt that block')
 
@@ -233,9 +184,18 @@ def body_decrypt(infile, session_keys, output, offset):
         infile.seek(start_ciphersegment, io.SEEK_CUR)  # move forward
 
     try:
-        for ciphersegment in cipher_chunker(infile, CIPHER_SEGMENT_SIZE):
-            segment = decrypt_block(ciphersegment, session_keys)
-            output.send(segment)
+        segment = bytearray(SEGMENT_SIZE)
+        ciphersegment = bytearray(CIPHER_SEGMENT_SIZE)
+
+        while True:
+            ciphersegment_len = infile.readinto(ciphersegment)
+            if ciphersegment_len == 0: 
+                break # We were at the last segment. Exits the loop
+            assert( ciphersegment_len > CIPHER_DIFF )
+
+            plen = decrypt_block(segment, ciphersegment[:ciphersegment_len], session_keys)
+            output.send(segment[:plen])
+
     except ProcessingOver:  # output raised it
         pass
 
@@ -247,6 +207,7 @@ class DecryptedBuffer():
         self.buf = io.BytesIO()
         self.block = 0  # just used for printing, if that block is entirely skipped
         self.output = output
+        self.segment = bytearray(SEGMENT_SIZE)
 
     def _append_to_buf(self, data):
         assert( data ), "Why are you adding 'nothing'?"
@@ -281,9 +242,9 @@ class DecryptedBuffer():
         # else, we decrypt
         LOG.debug('Decrypting block %d', self.block)
         assert( len(data) > CIPHER_DIFF )
-        segment = decrypt_block(data, self.session_keys)
-        LOG.debug('Adding %d bytes to the buffer', len(segment))
-        self._append_to_buf(segment)
+        plen = decrypt_block(self.segment, data, self.session_keys)
+        LOG.debug('Adding %d bytes to the buffer', plen)
+        self._append_to_buf(self.segment[:plen])
         LOG.debug('Buffer size: %d', self.buf_size())
         
     def skip(self, size):
@@ -381,6 +342,7 @@ def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
     )
 
     session_keys, edit_list = header.deconstruct(infile, keys, sender_pubkey=sender_pubkey)
+    LOG.debug("Session keys: %s", [k.hex() for k in session_keys])
 
     # Infile in now positioned at the beginning of the data portion
 
@@ -391,7 +353,8 @@ def decrypt(keys, infile, outfile, sender_pubkey=None, offset=0, span=None):
     if edit_list is None:
         # No edit list: decrypt all segments until the end
         body_decrypt(infile, session_keys, output, offset)
-        # We could use body_decrypt_parts but there is an inner buffer, and segments might not be aligned
+        # We could use body_decrypt_parts 
+        # but there is an inner buffer, and segments might not be aligned
     else:
         # Edit list: it drives which segments is decrypted
         body_decrypt_parts(infile, session_keys, output, edit_list=list(edit_list))

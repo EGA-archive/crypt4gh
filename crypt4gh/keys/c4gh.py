@@ -67,8 +67,6 @@ def generate(seckey, pubkey, passphrase=None, comment=None):
     sk = os.urandom(32)
     LOG.debug('Private Key: %s', sk.hex().upper())
 
-    os.umask(0o277) # Restrict to r-- --- ---
-
     with open(seckey, 'bw') as f:
         pkey = encode_private_key(sk, passphrase, comment)
         LOG.debug('Encoded Private Key: %s', pkey.hex().upper())
@@ -77,7 +75,9 @@ def generate(seckey, pubkey, passphrase=None, comment=None):
         f.write(b64encode(pkey))
         f.write(b'\n-----END CRYPT4GH PRIVATE KEY-----\n')
 
-    os.umask(0o133) # Restrict to rw- r-- r--
+    # don't trust the umask, and fix the permissions for the seckey
+    # let the umask fix the permissions for the pubkey
+    os.chmod(seckey, 0o400)
 
     with open(pubkey, 'bw', ) as f:
         f.write(b'-----BEGIN CRYPT4GH PUBLIC KEY-----\n')

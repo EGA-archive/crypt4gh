@@ -60,7 +60,7 @@ def encode_private_key(key, passphrase, comment):
 	    (encode_string(comment) if comment is not None else b'')) # optional comment
 
 
-def generate(seckey, pubkey, passphrase=None, comment=None):
+def generate(seckey, pubkey, passphrase, comment):
     '''Generate a keypair.'''
 
 

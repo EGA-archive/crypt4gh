@@ -188,15 +188,6 @@ def _main():
         return
 
 
-    for k in (pubkey, seckey):
-        if k.is_file():
-            if not args['-f']: # Don't force
-                yn = input(f'{k} already exists. Do you want to overwrite it? (y/n) ')
-                if yn != 'y':
-                    print('Ok. Fair enough. Exiting.')
-                    #sys.exit(0)
-                    return
-            os.remove(k)
 
     print(f"Generating public/private Crypt4GH key pair{comment_message}.")
     passphrase1 = passphrase2 = None
@@ -208,11 +199,22 @@ def _main():
         print('Passphrases do not match', file=sys.stderr)
         sys.exit(1)
 
-    # Generate directories if needed
-    for d in [seckey.parent, pubkey.parent]:
-        if not d.exists():
-            d.mkdir(mode=0o700, parents=True, exist_ok=True)
-            print("Created directory", str(d))
+    for k in (pubkey, seckey):
+        if k.is_file():
+            if not args['-f']: # Don't force
+                yn = input(f'{k} already exists. Do you want to overwrite it? (y/n) ')
+                if yn != 'y':
+                    print('Ok. Fair enough. Exiting.')
+                    #sys.exit(0)
+                    return
+            os.remove(k)
+        elif not k.parent.exists():
+            yn = input(f'Create directory {k.parent}? (y/n) ')
+            if yn != 'y':
+                print('Ok. Fair enough. Exiting.')
+                #sys.exit(0)
+                return
+            k.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
 
     # ... and cue music
     c4gh.generate(seckey, pubkey, passphrase=passphrase1, comment=comment)

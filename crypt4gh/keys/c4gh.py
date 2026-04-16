@@ -2,11 +2,12 @@ import logging
 import os
 import sys
 from base64 import b64encode
+import stat
 
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
 from .kdf import derive_key, get_kdf, scrypt_supported, KDFS
-from ..exceptions import exit_on_invalid_passphrase
+from .. import sodium, exceptions
 
 LOG = logging.getLogger(__name__)
 
@@ -59,16 +60,13 @@ def encode_private_key(key, passphrase, comment):
 	    (encode_string(comment) if comment is not None else b'')) # optional comment
 
 
-def generate(seckey, pubkey, passphrase=None, comment=None):
+def generate(seckey, pubkey, passphrase, comment):
     '''Generate a keypair.'''
 
-    # Generate the keys
+
     sk = os.urandom(32)
     LOG.debug('Private Key: %s', sk.hex().upper())
 
-    os.umask(0o277) # Restrict to r-- --- ---
-
-    # open the file
     with open(seckey, 'bw') as f:
         pkey = encode_private_key(sk, passphrase, comment)
         LOG.debug('Encoded Private Key: %s', pkey.hex().upper())
@@ -77,7 +75,9 @@ def generate(seckey, pubkey, passphrase=None, comment=None):
         f.write(b64encode(pkey))
         f.write(b'\n-----END CRYPT4GH PRIVATE KEY-----\n')
 
-    os.umask(0o133) # Restrict to rw- r-- r--
+    # don't trust the umask, and fix the permissions for the seckey
+    # let the umask fix the permissions for the pubkey
+    os.chmod(seckey, 0o400)
 
     with open(pubkey, 'bw', ) as f:
         f.write(b'-----BEGIN CRYPT4GH PUBLIC KEY-----\n')
@@ -91,7 +91,7 @@ def generate(seckey, pubkey, passphrase=None, comment=None):
 ## Decoding
 #######################################################################
 
-@exit_on_invalid_passphrase
+@exceptions.exit_on_invalid_passphrase
 def parse_private_key(stream, callback):
 
     kdfname = decode_string(stream)
@@ -130,3 +130,27 @@ def parse_private_key(stream, callback):
     encrypted_data = private_data[12:]
     return ChaCha20Poly1305(shared_key).decrypt(nonce, encrypted_data, None)  # No add
 
+
+
+#######################################################################
+## Relocking
+#######################################################################
+
+def relock(seckey, sk, passphrase, comment):
+
+    # add -w- --- ---
+    os.chmod(seckey,
+             os.stat(seckey).st_mode | stat.S_IWUSR)
+
+    with open(seckey, 'bw') as f:
+        pkey = encode_private_key(sk, passphrase, comment)
+        LOG.debug('Encoded Private Key: %s', pkey.hex().upper())
+
+        f.write(b'-----BEGIN CRYPT4GH PRIVATE KEY-----\n')
+        f.write(b64encode(pkey))
+        f.write(b'\n-----END CRYPT4GH PRIVATE KEY-----\n')
+
+    # back to r-- --- ---
+    os.chmod(seckey,
+             os.stat(seckey).st_mode & 0o400)
+    

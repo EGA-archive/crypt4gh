@@ -106,7 +106,7 @@ setup(name='crypt4gh',
       entry_points={
           'console_scripts': [
               f'crypt4gh=crypt4gh.__main__:main',
-              f'crypt4gh-keygen=crypt4gh.keys.__init__:main',
+              f'crypt4gh-keygen=crypt4gh.keys.__main__:main',
           ]
       },
       platforms='any',

@@ -88,6 +88,12 @@ jobs:
   upload_pypi:
     needs: [build_wheels, build_sdist]
     runs-on: ubuntu-latest
+
+    environment:
+      name: pypi
+      url: https://pypi.org/p/<package-name>  # Replace <package-name> with your PyPI project name
+
+
     environment: ${{ case(github.ref_type == 'tag', 'pypi', 'testpypi') }}
 
     permissions:
@@ -109,3 +115,50 @@ jobs:
       # - name: Publish distribution to PyPI
       #   # if: github.ref_type == 'tag'
       #   uses: pypa/gh-action-pypi-publish@release/v1
+
+
+  publish-to-testpypi:
+    needs: [build_wheels, build_sdist]
+    runs-on: ubuntu-latest
+
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/crypt4gh
+
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Get artifacts
+        uses: actions/download-artifact@v8
+        with:
+          merge-multiple: true
+          path: dist
+
+      - name: Publish distribution to Test PyPI
+        # if: github.ref_type == 'branch'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  publish-to-pypi:
+    needs: [build_wheels, build_sdist]
+    runs-on: ubuntu-latest
+
+    environment:
+      name: pypi
+      url: https://pypi.org/p/crypt4gh
+
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Get artifacts
+        uses: actions/download-artifact@v8
+        with:
+          merge-multiple: true
+          path: dist
+
+      - name: Publish distribution to PyPI
+        # if: github.ref_type == 'tag'
+        uses: pypa/gh-action-pypi-publish@release/v1

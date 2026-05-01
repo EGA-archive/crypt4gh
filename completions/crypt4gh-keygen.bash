@@ -1,12 +1,27 @@
+_crypt4gh_keygen() {
+    local cmd cur prev
+    cmd=$1
+    cur=$2
+    prev=$3
 
-_crypt4ghkeygen()
-{
-    local cur
-    cur="${COMP_WORDS[COMP_CWORD]}"
+    # We check the previous word and potentially already conclude
+    case "$prev" in
+        crypt4gh-keygen)
+            COMPREPLY=( $(compgen -W '-h --help -v --version --log -f --pk --sk --nocrypt -C --relock' -- "$cur") )
+            compopt +o filenames +o dirnames  # Disable file/directory completion
+            ;;
+        -h|--help|-v|--version|-C) # No more suggestions
+            COMPREPLY=()
+            compopt +o filenames +o dirnames  
+            ;;
+        --log|--sk|--pk)
+            COMPREPLY=( $(compgen -f -- "$cur") )  # Enable filename completion
+	    ;;
+	*)
+            COMPREPLY=( $(compgen -W '-f --pk --sk --nocrypt -C --relock' -- "$cur") )
+	    ;;
+    esac
 
-    if [ $COMP_CWORD -ge 1 ]; then
-        COMPREPLY=( $( compgen -W '-h --help -v --version --log= -f --pk= --sk= --nocrypt -C= ' -- $cur) )
-    fi
 }
 
-complete -o bashdefault -o default -o filenames -F _crypt4ghkeygen crypt4gh-keygen
+complete -F _crypt4gh_keygen crypt4gh-keygen

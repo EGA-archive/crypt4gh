@@ -112,3 +112,16 @@ Finally, run
 ```
 pip install ./crypt4gh
 ```
+
+## Bash completions
+
+If you use `bash` and want auto-completions, you can install the [2 extra scripts](completions), by setting the environment variable `CRYPT4GH_BASH_COMPLETIONS` to the proper locations for your setup.
+
+For example, if you use the default setup for `bash-completion >= 2.x`, you can install them with:
+
+	export CRYPT4GH_BASH_COMPLETIONS='~/.local/share/bash-completion/completions'
+	# before you run
+	pip install ...
+
+If you don't use `bash`, help me out with a PR and add crypt4gh.zsh, crypt4gh.tcsh, etc... and instructions
+

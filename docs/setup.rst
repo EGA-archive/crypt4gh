@@ -52,11 +52,27 @@ For that, you set the following environment variables before running ``pip insta
 
    Help me out if you know how to resolve that.
 
-
-
 .. _EGA-archive Github repo: https://github.com/EGA-archive/crypt4gh
 .. _libsodium: https://libsodium.org
 
+----
+
+Bash completions
+================
+
+If you use `bash` and want auto-completions, you can install the 2 extra scripts from the `completions folder`_, by setting the environment variable `CRYPT4GH_BASH_COMPLETIONS` to the proper locations for your setup.
+
+For example, if you use the default setup for `bash-completion >= 2.x`, you can install them with:
+
+.. code-block:: console
+
+    export CRYPT4GH_BASH_COMPLETIONS='~/.local/share/bash-completion/completions'
+    # before you run
+    pip install ...
+
+If you don't use `bash`, help me out with a PR and add crypt4gh.zsh, crypt4gh.tcsh, etc... and instructions
+
+.. _completions folder: https://github.com/EGA-archive/crypt4gh/tree/master/completions
 
 ----
 

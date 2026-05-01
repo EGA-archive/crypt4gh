@@ -8,7 +8,7 @@ import shutil
 
 from setuptools import setup, find_packages, Extension
 from setuptools.command.build_ext import build_ext
-from distutils.command.clean import clean
+from setuptools.command.install import install
 
 _here = Path(__file__).parent
 
@@ -71,11 +71,9 @@ CFLAGS and LDFLAGS may be needed.
 
         super().run()
 
-class CleanLibsodium(clean):
+class CleanLibsodium():
     description = 'remove libsodium-build and crypt4gh/libs directories'
     def run(self):
-        super().run()
-
         if use_system_sodium:
             return
 
@@ -86,7 +84,26 @@ class CleanLibsodium(clean):
             print('Cleaning up', LIBSODIUM)
             subprocess.check_call(['make', 'clean'], cwd=str(LIBSODIUM))
 
+class BashCompletion(install):
+    description = 'Install bash completion if on BASH'
 
+    def run(self):
+        super().run()
+
+        completion_dir = os.getenv("CRYPT4GH_BASH_COMPLETIONS", None)
+        if not completion_dir:
+            return
+
+        completion_dir = Path(completion_dir).expanduser()
+        src = _here / 'completions'
+        try:
+            completion_dir.mkdir(parents=True, exist_ok=True)
+            for script in src.glob('*.bash'):
+                target = completion_dir / script.stem  # strips .bash extension
+                target.write_text(script.read_text()) # copy
+                print('Installed bash completion:', target)
+        except Exception as e:
+            print('Could not install bash completion:', repr(e), file=sys.stderr)
 
 setup(name='crypt4gh',
       version='1.8',
@@ -127,15 +144,15 @@ setup(name='crypt4gh',
       ],
       python_requires='>=3.9',
       # See https://packaging.python.org/discussions/install-requires-vs-requirements/
-      install_requires=[
-          'docopt-ng', # include version when needed
+      install_requires=[ # include version when needed
+          'docopt-ng', 
           'cryptography>=2.8',
-          'bcrypt', # include version when needed
-          'setuptools', # include version when needed
+          'bcrypt',
       ],
       cmdclass={
           'build_ext': BuildLibsodium,
           'clean': CleanLibsodium,
+          'install': BashCompletion,
       },
       ext_modules=[
           Extension(

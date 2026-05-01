@@ -1,6 +1,13 @@
 name: Testsuite
 
-on: [push]
+on:
+  push:
+    branches:
+      # - master
+      # - releases/*
+      - '**' # cover everything
+    tags-ignore:
+      - '**'        # but never on tags
 
 jobs:
 

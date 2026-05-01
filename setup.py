@@ -106,7 +106,7 @@ class BashCompletion(install):
             print('Could not install bash completion:', repr(e), file=sys.stderr)
 
 setup(name='crypt4gh',
-      version='1.8',
+      version='1.8.2',
       url='https://www.github.com/EGA-archive/crypt4gh',
       license='Apache License 2.0',
       author='Frédéric Haziza',

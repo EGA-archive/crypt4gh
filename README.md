@@ -1,5 +1,7 @@
 [![Documentation Status](https://readthedocs.org/projects/crypt4gh/badge/?version=latest)](https://crypt4gh.readthedocs.io/en/latest/?badge=latest)
 [![Testsuite](https://github.com/EGA-archive/crypt4gh/workflows/Testsuite/badge.svg)](https://github.com/EGA-archive/crypt4gh/actions)
+[![PyPI version](https://img.shields.io/pypi/v/crypt4gh)](https://pypi.org/project/crypt4gh/)
+[![Python versions](https://img.shields.io/pypi/pyversions/crypt4gh)](https://pypi.org/project/crypt4gh/)
 
 # Crypt4GH Encryption Utility
 

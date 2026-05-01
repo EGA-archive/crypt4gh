@@ -1,11 +1,11 @@
 name: Publish wheels
 
-on: # only when we tag the master branch
+
+on:
   push:
     tags:
       - v[1-9]+.*
-    branches:
-      - releases/*
+    
 
 jobs:
   build_wheels:
@@ -87,7 +87,7 @@ jobs:
 
 
   publish-to-testpypi:
-    if: github.ref_type == 'branch' && startsWith(github.ref_name, 'releases/')
+    if: github.ref_type == 'tag' && github.event.base_ref != 'refs/heads/master'
     needs: [build_wheels, build_sdist]
     runs-on: ubuntu-latest
 
@@ -111,7 +111,7 @@ jobs:
           repository-url: https://test.pypi.org/legacy/
 
   publish-to-pypi:
-    if: github.ref_type == 'tag'
+    if: github.ref_type == 'tag' && github.event.base_ref == 'refs/heads/master'
     needs: [build_wheels, build_sdist]
     runs-on: ubuntu-latest
 

@@ -123,7 +123,6 @@ setup(name='crypt4gh',
               f'crypt4gh-keygen=crypt4gh.keys.__main__:main',
           ]
       },
-      platforms='any',
       classifiers=[
           'Development Status :: 5 - Production/Stable',
 
@@ -139,16 +138,23 @@ setup(name='crypt4gh',
           'Intended Audience :: Information Technology',
           'Topic :: Security :: Cryptography',
           'Topic :: Scientific/Engineering :: Bio-Informatics',
+          'Topic :: Scientific/Engineering :: Medical Science Apps.',
+          
+          'Intended Audience :: Science/Research',
+          'Environment :: Console',
           
           'Programming Language :: Python :: Implementation :: CPython',
           
+          'Programming Language :: Python :: 3',
+          'Programming Language :: Python :: 3 :: Only',
+ 
           'Programming Language :: Python :: 3.9',
           'Programming Language :: Python :: 3.10',
           'Programming Language :: Python :: 3.11',
           'Programming Language :: Python :: 3.12',
           'Programming Language :: Python :: 3.13',
           'Programming Language :: Python :: 3.14',
-          'Programming Language :: Python :: 3.14t',
+          # 'Programming Language :: Python :: 3.14t',
       ],
       python_requires='>=3.9',
       # See https://packaging.python.org/discussions/install-requires-vs-requirements/

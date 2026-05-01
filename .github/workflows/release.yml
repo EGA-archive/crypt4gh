@@ -1,0 +1,111 @@
+name: Publish wheels
+
+on: # only when we tag the master branch
+  push:
+    tags:
+      - v[0-9]+.*
+    branches:
+      - master
+
+jobs:
+  build_wheels:
+    name: Build wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      matrix:
+        include:
+          - os: linux-intel
+            runs-on: ubuntu-latest
+          - os: linux-arm
+            runs-on: ubuntu-24.04-arm
+          - os: windows-intel
+            runs-on: windows-latest
+          - os: windows-arm
+            runs-on: windows-11-arm
+          - os: macos-intel
+            # macos-15-intel is the last x86_64 runner
+            runs-on: macos-15-intel
+          - os: macos-arm
+            # macos-14+ (including latest) are ARM64 runners
+            runs-on: macos-latest
+
+        # build: ["cp39-* cp310-* cp311-* cp312-* cp313-* cp314-*"]
+
+    steps:
+      - name: Checkout crypt4gh (with the bundled libsodium)
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v3.4.1
+        env:
+          CIBW_PLATFORM: 'auto'
+          CIBW_ARCHS: 'auto' # native
+          CIBW_BUILD_VERBOSITY: 1
+        # with:
+        #   package-dir: .
+        #   output-dir: wheelhouse
+        #   config-file: "{package}/pyproject.toml"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cibw-wheels-${{ matrix.os }}-${{ strategy.job-index }}
+          path: ./wheelhouse/*.whl
+
+
+  build_sdist:
+    runs-on: ubuntu-latest
+    env:
+      job_python_version: "3.14"
+
+    steps:
+      - name: Checkout crypt4gh (with the bundled libsodium)
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Set up Python ${{ env.job_python_version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.job_python_version }}
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Create source distribution
+        run:  python setup.py sdist --owner=root --group=root
+
+      - name: Upload sdist artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: sdist
+          path: dist/crypt4gh-*.tar.gz
+
+  upload_pypi:
+    needs: [build_wheels, build_sdist]
+    runs-on: ubuntu-latest
+    environment: ${{ case(github.ref_type == 'tag', 'pypi', 'testpypi') }}
+
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Get artifacts
+        uses: actions/download-artifact@v8
+        with:
+          merge-multiple: true
+          path: dist
+
+      - name: Publish distribution to Test PyPI
+        # if: github.ref_type == 'branch'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+      # - name: Publish distribution to PyPI
+      #   # if: github.ref_type == 'tag'
+      #   uses: pypa/gh-action-pypi-publish@release/v1

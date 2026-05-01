@@ -1,0 +1,22 @@
+include completions/crypt4gh.bash
+include completions/crypt4gh-keygen.bash
+# and copy those files to 
+# ~/.local/share/bash-completion/completions/.
+
+include LICENSE
+include README.md
+include requirements.txt
+
+global-exclude __pycache__
+
+graft libsodium-stable
+
+prune libsodium-stable/.git
+prune libsodium-stable/.github
+exclude libsodium-stable/.git*
+
+prune libsodium-stable/test
+
+prune tests
+
+prune docs

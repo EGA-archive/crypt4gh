@@ -98,10 +98,7 @@ setup(name='crypt4gh',
       long_description=(_here / 'README.md').read_text(),
       long_description_content_type='text/markdown',
       packages=find_packages(),
-      include_package_data=True,
-      package_data={
-          'crypt4gh': ['completions'],
-      },
+      include_package_data=True, # use MANIFEST.in
       zip_safe=False,
       entry_points={
           'console_scripts': [
@@ -128,7 +125,7 @@ setup(name='crypt4gh',
 
           'Programming Language :: Python :: Implementation :: CPython',
       ],
-      python_requires='>=3.6',
+      python_requires='>=3.9',
       # See https://packaging.python.org/discussions/install-requires-vs-requirements/
       install_requires=[
           'docopt-ng', # include version when needed

@@ -106,7 +106,7 @@ class BashCompletion(install):
             print('Could not install bash completion:', repr(e), file=sys.stderr)
 
 setup(name='crypt4gh',
-      version='1.8.2',
+      version='1.8.3',
       url='https://www.github.com/EGA-archive/crypt4gh',
       license='Apache License 2.0',
       author='Frédéric Haziza',
@@ -124,7 +124,7 @@ setup(name='crypt4gh',
           ]
       },
       platforms='any',
-      classifiers=[  # Optional
+      classifiers=[
           'Development Status :: 5 - Production/Stable',
 
           'Natural Language :: English',
@@ -132,15 +132,23 @@ setup(name='crypt4gh',
           'Operating System :: POSIX',
           'Operating System :: POSIX :: BSD',
           'Operating System :: POSIX :: Linux',
-          # 'Operating System :: Microsoft :: Windows,
-
+          # 'Operating System :: Microsoft :: Windows',
+          
           'Intended Audience :: Developers',
           'Intended Audience :: Healthcare Industry',
           'Intended Audience :: Information Technology',
           'Topic :: Security :: Cryptography',
           'Topic :: Scientific/Engineering :: Bio-Informatics',
-
+          
           'Programming Language :: Python :: Implementation :: CPython',
+          
+          'Programming Language :: Python :: 3.9',
+          'Programming Language :: Python :: 3.10',
+          'Programming Language :: Python :: 3.11',
+          'Programming Language :: Python :: 3.12',
+          'Programming Language :: Python :: 3.13',
+          'Programming Language :: Python :: 3.14',
+          'Programming Language :: Python :: 3.14t',
       ],
       python_requires='>=3.9',
       # See https://packaging.python.org/discussions/install-requires-vs-requirements/

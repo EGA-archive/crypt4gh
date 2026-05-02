@@ -1,9 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+'''This module installs shell completion scripts'''
 
-'''This module install shell completion scripts'''
-
-import argparse
 import sys
 from pathlib import Path
 
@@ -27,68 +25,97 @@ SHELLS = {
     'sh':   (_HOME / '.sh/completions',                          True),
 }
 
-
-supported_shells = 'Supported shells and default target locations:'
-for k, (d,_) in SHELLS.items():
-    supported_shells += f'\n\t{k:>5}: {d}'
-# inefficient but working
-
 __doc__ = f'''
- 
 Utility to install Crypt4GH shell completion scripts.
 
 Usage:
    {PROG}-install-completions [-hv] <shell> [--target <dir>]
+   {PROG}-install-completions [-hv] --show [<shell>]
 
 Arguments:
-  <shell>       Shell type. Supported: bash, zsh, fish, ksh, tcsh, csh, sh
+  <shell>       Shell type.
 
 Options:
    -h, --help        Prints this help and exit
    -v, --version     Prints the version and exits
+   --show            Show what would be installed, or list default locations if no shell is given.
    --target <dir>    Directory to install completions into.
                      Defaults to the standard user-local location for the chosen shell (see below).
-
-{supported_shells}
-
 '''
+
+def show_defaults():
+    headers = ('Shell', 'Default location', 'Scripts')
+    rows = []
+    for k, (d, _) in SHELLS.items():
+        scripts = list(_HERE.glob(f'*.{k}'))
+        status = ', '.join(s.name for s in scripts) if scripts else '(none shipped)'
+        rows.append((k, str(d), status))
+
+    col_widths = [
+        max(len(h), max(len(r[i]) for r in rows))
+        for i, h in enumerate(headers)
+    ]
+
+    def fmt(row):
+        return '  | ' + ' | '.join(f'{cell:<{col_widths[i]}}' for i, cell in enumerate(row)) + ' |'
+
+    sep = '  |-' + '-|-'.join('-' * w for w in col_widths) + '-|'
+
+    print()
+    print(fmt(headers))
+    print(sep)
+    for row in rows:
+        print(fmt(row))
+
+def show(shell):
+    default_dir, _ = SHELLS.get(shell, (None, True))
+    scripts = list(_HERE.glob(f'*.{shell}'))
+    print(f"\n  Shell:    {shell}")
+    print(f"  Default:  {default_dir or '(unknown shell, use --target)'}")
+    if scripts:
+        print(f"  Scripts to install:")
+        for s in scripts:
+            print(f"    ✔  {s.name}")
+    else:
+        print(f"  ✗  No scripts shipped for {shell!r}")
 
 def main():
     version = f'{__title__} (version {__version__})'
     args = docopt(__doc__, sys.argv[1:], version=version)
 
     shell = args['<shell>']
-    if shell not in SHELLS: # keys
-        print(f"  ✗  Unsupported shell {shell!r}. Choose from: {', '.join(SHELLS)}",
-              file=sys.stderr)
-        sys.exit(1)
 
-    default_dir, keep_extension = SHELLS[shell]
+    if args['--show']:
+        show(shell) if shell else show_defaults()
+        print()
+        return
 
+    default_dir, keep_extension = SHELLS.get(shell, (None, True))
     target_dir = args['--target']
     dest = Path(target_dir).expanduser().resolve() if target_dir else default_dir
 
-    scripts = list(_HERE.glob('*.' + shell)) # gen => list, so we can "if not list"
+    if dest is None:
+        print(f"  ✗  Unknown shell {shell!r} and no --target provided.\n"
+              f"     Please specify a target directory with --target <dir>",
+              file=sys.stderr)
+        sys.exit(1)
 
+    scripts = list(_HERE.glob('*.' + shell))
     if not scripts:
         print(f"""\
-  ✗  No {shell} completion scripts are currently shipped with this package.
-
-  contributed to the project.
+  ✗  No {shell!r} completion scripts are currently shipped with this package.
   If you know how to write completion scripts for {shell},
   please contribute with a pull request at:
   https://github.com/EGA-archive/crypt4gh/pulls""", file=sys.stderr)
         sys.exit(1)
 
     dest.mkdir(parents=True, exist_ok=True)
-
     print(f"\n  Installing crypt4gh {shell} completions → {dest}\n")
     for script in scripts:
         target = dest / (script.name if keep_extension else script.stem)
-        target.write_text(script.read_text()) # copy content
-        print(f"    ✔  {script}")
-
-    print(f"\n  Done! You may need to restart your shell or source your rc file for completions to take effect.\n")
+        target.write_text(script.read_text())
+        print(f"    ✔  {script.name} → {target.name}")
+    print("\n  Done! You may need to restart your shell or source your rc file for completions to take effect.\n")
 
 if __name__ == "__main__":
     main()

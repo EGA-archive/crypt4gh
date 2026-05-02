@@ -1,0 +1,94 @@
+#compdef crypt4gh
+
+# Zsh completion for crypt4gh
+# Install: place this file in a directory on your $fpath, e.g.:
+#   cp _crypt4gh ~/.zsh/completions/
+#   fpath=(~/.zsh/completions $fpath)
+#   autoload -Uz compinit && compinit
+
+_crypt4gh() {
+  local state subcommand
+  local -a subcommands global_opts
+
+  subcommands=(
+    'encrypt:Encrypt a file'
+    'decrypt:Decrypt a file'
+    'rearrange:Rearrange an encrypted file'
+    'reencrypt:Re-encrypt a file for a different recipient'
+  )
+
+  # (- :) means: if this option is present, complete nothing else
+  global_opts=(
+    '(- :)'{-h,--help}'[Show help and exit]'
+    '(- :)'{-v,--version}'[Show version and exit]'
+    '--log[Path to log file]:log file:_files'
+  )
+
+  # Find the subcommand already present in $words
+  local -i i
+  for (( i = 2; i <= $#words; i++ )); do
+    case "${words[i]}" in
+      encrypt|decrypt|rearrange|reencrypt)
+        subcommand="${words[i]}"
+        break
+        ;;
+    esac
+  done
+
+  if [[ -z "$subcommand" ]]; then
+    _arguments -C \
+      "${global_opts[@]}" \
+      '1: :->subcommand' \
+      '*: :->args'
+
+    case $state in
+      subcommand)
+        _describe 'subcommand' subcommands
+        ;;
+    esac
+    return
+  fi
+
+  # Subcommand found — complete its options
+  case "$subcommand" in
+    encrypt)
+      _arguments \
+        '(- :)'{-h,--help}'[Show help and exit]' \
+        '--sk[Secret key file]:secret key file:_files' \
+        '*--recipient_pk[Recipient public key file]:public key file:_files' \
+        '--range[Byte range to encrypt]:byte range' \
+        '--header[Header output file]:header file:_files' \
+        '::input file:_files' \
+        '::output file:_files'
+      ;;
+    decrypt)
+      _arguments \
+        '(- :)'{-h,--help}'[Show help and exit]' \
+        '--sk[Secret key file]:secret key file:_files' \
+        '--sender_pk[Sender public key file for verification]:public key file:_files' \
+        '--range[Byte range to decrypt]:byte range' \
+        '::input file:_files' \
+        '::output file:_files'
+      ;;
+    rearrange)
+      _arguments \
+        '(- :)'{-h,--help}'[Show help and exit]' \
+        '--sk[Secret key file]:secret key file:_files' \
+        '--range[Byte range]:byte range' \
+        '::input file:_files' \
+        '::output file:_files'
+      ;;
+    reencrypt)
+      _arguments \
+        '(- :)'{-h,--help}'[Show help and exit]' \
+        '--sk[Secret key file]:secret key file:_files' \
+        '*--recipient_pk[Recipient public key file]:public key file:_files' \
+        '(-t --trim)'{-t,--trim}'[Trim re-encryption]' \
+        '--header-only[Re-encrypt header only]' \
+        '::input file:_files' \
+        '::output file:_files'
+      ;;
+  esac
+}
+
+_crypt4gh "$@"

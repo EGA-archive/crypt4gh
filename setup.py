@@ -8,7 +8,6 @@ import shutil
 
 from setuptools import setup, find_packages, Extension
 from setuptools.command.build_ext import build_ext
-from setuptools.command.install import install
 
 _here = Path(__file__).parent
 
@@ -84,34 +83,6 @@ class CleanLibsodium():
             print('Cleaning up', LIBSODIUM)
             subprocess.check_call(['make', 'clean'], cwd=str(LIBSODIUM))
 
-class ShellCompletions(install):
-    description = 'Install shell completions'
-
-    def run(self):
-        super().run()
-        
-        shells = ['BASH', 'ZSH', 'TCSH', 'CSH', 'KSH', 'SH' ]
-        src = _here / 'completions'
-
-        for shell in shells:
-            completion_dir = os.getenv(f'CRYPT4GH_{shell}_COMPLETIONS', None)
-            if not completion_dir:
-                continue
-            completion_dir = Path(completion_dir).expanduser()
-            scripts = src.glob('*.' + shell, case_sensitive=False)
-            if not scripts:
-                continue
-            try:
-                completion_dir.mkdir(parents=True, exist_ok=True)
-                for script in scripts:
-                    target = completion_dir / script.stem  # strips extension
-                    target.write_text(script.read_text()) # copy content
-                    print('Installed completion:', script)
-            except Exception as e:
-                print('Error installing', shell, 'completions:', repr(e), file=sys.stderr)
-
-
-
 setup(name='crypt4gh',
       version='1.8.4',
       url='https://www.github.com/EGA-archive/crypt4gh',
@@ -126,8 +97,9 @@ setup(name='crypt4gh',
       zip_safe=False,
       entry_points={
           'console_scripts': [
-              f'crypt4gh=crypt4gh.__main__:main',
-              f'crypt4gh-keygen=crypt4gh.keys.__main__:main',
+              'crypt4gh=crypt4gh.__main__:main',
+              'crypt4gh-keygen=crypt4gh.keys.__main__:main',
+              'crypt4gh-install-completions=crypt4gh.completions.__main__:main',
           ]
       },
       classifiers=[
@@ -173,7 +145,6 @@ setup(name='crypt4gh',
       cmdclass={
           'build_ext': BuildLibsodium,
           'clean': CleanLibsodium,
-          'install': ShellCompletions,
       },
       ext_modules=[
           Extension(

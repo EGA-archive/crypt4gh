@@ -1,7 +1,10 @@
-include completions/crypt4gh.bash
-include completions/crypt4gh-keygen.bash
-# and copy those files to 
-# ~/.local/share/bash-completion/completions/.
+include crypt4gh/completions/*.bash
+include crypt4gh/completions/*.zsh
+include crypt4gh/completions/*.fish
+include crypt4gh/completions/*.ksh
+include crypt4gh/completions/*.tcsh
+include crypt4gh/completions/*.csh
+include crypt4gh/completions/*.sh
 
 include LICENSE
 include README.md

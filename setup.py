@@ -84,7 +84,7 @@ class CleanLibsodium():
             subprocess.check_call(['make', 'clean'], cwd=str(LIBSODIUM))
 
 setup(name='crypt4gh',
-      version='1.8.5',
+      version='1.8.6',
       url='https://www.github.com/EGA-archive/crypt4gh',
       license='Apache License 2.0',
       author='Frédéric Haziza',
@@ -99,7 +99,7 @@ setup(name='crypt4gh',
           'console_scripts': [
               'crypt4gh=crypt4gh.__main__:main',
               'crypt4gh-keygen=crypt4gh.keys.__main__:main',
-              'crypt4gh-install-completions=crypt4gh.completions.__main__:main',
+              'crypt4gh-completions=crypt4gh.completions.__main__:main',
           ]
       },
       classifiers=[

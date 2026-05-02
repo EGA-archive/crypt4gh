@@ -117,20 +117,20 @@ pip install ./crypt4gh
 
 ## Shell completions
 
-If you want auto-completions, you can install extra scripts with the utility `crypt4gh-install-completions`.
+If you want auto-completions, you can install extra scripts with the utility `crypt4gh-completions`.
 
 For example, you can install the `bash` completion scripts with:
 
-	crypt4gh-install-completions bash
+	crypt4gh-completions install bash
 
 This will install in `~/.local/share/bash-completion/completions` (ie, the default location for 'bash-completion >= 2.x').
 
 Or specify the target directory, eg
 
-	crypt4gh-install-completions bash --target /etc/bash_completion.d
+	crypt4gh-completions install bash --target /etc/bash_completion.d
 
-So far, we provide the `bash` completions. Help me out with a PR for the other shells.
+So far, we provide the `bash` and `zsh` completions. Help me out with a PR for the other shells.
 
 List default locations and scripts with:
 
-	crypt4gh-install-completions --show
+	crypt4gh-completions show

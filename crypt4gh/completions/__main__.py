@@ -4,8 +4,7 @@
 
 import sys
 from pathlib import Path
-
-from docopt import docopt
+import argparse
 
 from .. import __title__, __version__, PROG
 
@@ -24,24 +23,6 @@ SHELLS = {
     'csh':  (_HOME / '.csh/completions',                         True),
     'sh':   (_HOME / '.sh/completions',                          True),
 }
-
-__doc__ = f'''
-Utility to install Crypt4GH shell completion scripts.
-
-Usage:
-   {PROG}-install-completions [-hv] <shell> [--target <dir>]
-   {PROG}-install-completions [-hv] --show [<shell>]
-
-Arguments:
-  <shell>       Shell type.
-
-Options:
-   -h, --help        Prints this help and exit
-   -v, --version     Prints the version and exits
-   --show            Show what would be installed, or list default locations if no shell is given.
-   --target <dir>    Directory to install completions into.
-                     Defaults to the standard user-local location for the chosen shell (see below).
-'''
 
 def show_defaults():
     headers = ('Shell', 'Default location', 'Scripts')
@@ -79,38 +60,72 @@ def show(shell):
     else:
         print(f"  ✗  No scripts shipped for {shell!r}")
 
+def make_parser():
+    parser = argparse.ArgumentParser(
+        prog=f'{PROG}-completions',
+        description='Utility to install Crypt4GH shell completion scripts.',
+    )
+    parser.add_argument('-v', '--version',
+                        action='version',
+                        version=f'{__title__} (version {__version__})')
+
+    subparsers = parser.add_subparsers(dest='command')
+
+    # install subcommand
+    install = subparsers.add_parser('install',
+                                     help='Install completion scripts for a shell.')
+    install.add_argument('shell',
+                         metavar='<shell>',
+                         help='Shell type.')
+    install.add_argument('--target',
+                         metavar='<dir>',
+                         help='Directory to install completions into. '
+                              'Defaults to the standard user-local location for the chosen shell.')
+
+    # show subcommand
+    show_p = subparsers.add_parser('show',
+                                    help='Show what would be installed, or list default locations.')
+    show_p.add_argument('shell',
+                        nargs='?',
+                        metavar='<shell>',
+                        help='Shell type. If omitted, lists all known default locations.')
+
+    return parser
+
 def main():
-    version = f'{__title__} (version {__version__})'
-    args = docopt(__doc__, sys.argv[1:], version=version)
 
-    shell = args['<shell>']
+    parser = make_parser()
+    args = parser.parse_args(sys.argv[1:])
 
-    if args['--show']:
-        show(shell) if shell else show_defaults()
+    if args.command == 'show':
+        show(args.shell) if args.shell else show_defaults()
         print()
         return
 
-    default_dir, keep_extension = SHELLS.get(shell, (None, True))
-    target_dir = args['--target']
-    dest = Path(target_dir).expanduser().resolve() if target_dir else default_dir
+    if args.command != 'install':
+        parser.print_usage(sys.stderr)
+        sys.exit(2)
+
+    default_dir, keep_extension = SHELLS.get(args.shell, (None, True))
+    dest = Path(args.target).expanduser().resolve() if args.target else default_dir
 
     if dest is None:
-        print(f"  ✗  Unknown shell {shell!r} and no --target provided.\n"
+        print(f"  ✗  Unknown shell {args.shell!r} and no --target provided.\n"
               f"     Please specify a target directory with --target <dir>",
               file=sys.stderr)
         sys.exit(1)
 
-    scripts = list(_HERE.glob('*.' + shell))
+    scripts = list(_HERE.glob('*.' + args.shell))
     if not scripts:
         print(f"""\
-  ✗  No {shell!r} completion scripts are currently shipped with this package.
-  If you know how to write completion scripts for {shell},
+  ✗  No {args.shell!r} completion scripts are currently shipped with this package.
+  If you know how to write completion scripts for {args.shell},
   please contribute with a pull request at:
   https://github.com/EGA-archive/crypt4gh/pulls""", file=sys.stderr)
         sys.exit(1)
 
     dest.mkdir(parents=True, exist_ok=True)
-    print(f"\n  Installing crypt4gh {shell} completions → {dest}\n")
+    print(f"\n  Installing crypt4gh {args.shell} completions → {dest}\n")
     for script in scripts:
         target = dest / (script.name if keep_extension else script.stem)
         target.write_text(script.read_text())

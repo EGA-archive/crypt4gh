@@ -60,21 +60,23 @@ For that, you set the following environment variables before running ``pip insta
 Shell completions
 =================
 
-If you want auto-completions, you can install extra scripts from the `completions folder`_, by exporting the environment variable ``CRYPT4GH_<shell>_COMPLETIONS`` to the proper locations for your setup. Replace ``<shell>`` with BASH, ZSH, TCSH, CSH, KSH, or SH. You can use multiple exports.
+If you want auto-completions, you can install extra scripts with the ``crypt4gh-install-completion`` utility.
 
 For example, you can install the ``bash`` completion scripts with:
 
 .. code-block:: console
 
-   export CRYPT4GH_BASH_COMPLETIONS='~/.local/share/bash-completion/completions'
-   # Default location for 'bash-completion >= 2.x'
-   # before you run:
-   pip install crypt4gh
+   crypt4gh-install-completion bash
 
-We provide the ``bash`` completions. Help me out with a PR for the other shells (... with instructions).
+This will install in ``~/.local/share/bash-completion/completions`` (ie, the default location for 'bash-completion >= 2.x').
 
+Or specify the target directory, eg
 
-.. _completions folder: https://github.com/EGA-archive/crypt4gh/tree/master/completions
+.. code-block:: console
+
+   crypt4gh-install-completion bash /etc/bash_completion.d
+
+So far, we provide the ``bash`` completions. Help me out with a PR for the other shells.
 
 ----
 

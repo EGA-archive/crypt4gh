@@ -84,29 +84,36 @@ class CleanLibsodium():
             print('Cleaning up', LIBSODIUM)
             subprocess.check_call(['make', 'clean'], cwd=str(LIBSODIUM))
 
-class BashCompletion(install):
-    description = 'Install bash completion if on BASH'
+class ShellCompletions(install):
+    description = 'Install shell completions'
 
     def run(self):
         super().run()
-
-        completion_dir = os.getenv("CRYPT4GH_BASH_COMPLETIONS", None)
-        if not completion_dir:
-            return
-
-        completion_dir = Path(completion_dir).expanduser()
+        
+        shells = ['BASH', 'ZSH', 'TCSH', 'CSH', 'KSH', 'SH' ]
         src = _here / 'completions'
-        try:
-            completion_dir.mkdir(parents=True, exist_ok=True)
-            for script in src.glob('*.bash'):
-                target = completion_dir / script.stem  # strips .bash extension
-                target.write_text(script.read_text()) # copy
-                print('Installed bash completion:', target)
-        except Exception as e:
-            print('Could not install bash completion:', repr(e), file=sys.stderr)
+
+        for shell in shells:
+            completion_dir = os.getenv(f'CRYPT4GH_{shell}_COMPLETIONS', None)
+            if not completion_dir:
+                continue
+            completion_dir = Path(completion_dir).expanduser()
+            scripts = src.glob('*.' + shell, case_sensitive=False)
+            if not scripts:
+                continue
+            try:
+                completion_dir.mkdir(parents=True, exist_ok=True)
+                for script in scripts:
+                    target = completion_dir / script.stem  # strips extension
+                    target.write_text(script.read_text()) # copy content
+                    print('Installed completion:', script)
+            except Exception as e:
+                print('Error installing', shell, 'completions:', repr(e), file=sys.stderr)
+
+
 
 setup(name='crypt4gh',
-      version='1.8.3',
+      version='1.8.4',
       url='https://www.github.com/EGA-archive/crypt4gh',
       license='Apache License 2.0',
       author='Frédéric Haziza',
@@ -166,7 +173,7 @@ setup(name='crypt4gh',
       cmdclass={
           'build_ext': BuildLibsodium,
           'clean': CleanLibsodium,
-          'install': BashCompletion,
+          'install': ShellCompletions,
       },
       ext_modules=[
           Extension(

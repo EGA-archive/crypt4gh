@@ -87,3 +87,4 @@ _crypt4gh() {
 }
 
 complete -F _crypt4gh crypt4gh
+# Note: do not use -o default or -o filenames, we handle it above

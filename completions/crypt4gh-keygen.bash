@@ -25,3 +25,4 @@ _crypt4gh_keygen() {
 }
 
 complete -F _crypt4gh_keygen crypt4gh-keygen
+# Note: do not use -o default or -o filenames, we handle it above

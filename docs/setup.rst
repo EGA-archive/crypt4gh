@@ -72,7 +72,11 @@ For example, you can install the ``bash`` completion scripts with:
    # Or specify the target directory
    crypt4gh-install-completions bash --target /etc/bash_completion.d
 
-   # List default locations and scripts
+
+You can list default locations and what scripts would be installed with:
+
+.. code-block:: console
+
    crypt4gh-install-completions --show
 
 So far, we provide the ``bash`` completions. Help me out with a PR for the other shells.

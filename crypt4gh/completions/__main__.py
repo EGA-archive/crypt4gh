@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 import argparse
 
-from .. import __title__, __version__, PROG
+from .. import __version__, PROG
 
 _HERE = Path(__file__).parent
 _HOME = Path.home()
@@ -61,13 +61,15 @@ def show(shell):
         print(f"  ✗  No scripts shipped for {shell!r}")
 
 def make_parser():
+
+    description = f'Utility to install Crypt4GH shell completion scripts (version {__version__}).'
     parser = argparse.ArgumentParser(
         prog=f'{PROG}-completions',
-        description='Utility to install Crypt4GH shell completion scripts.',
+        description=description,
     )
     parser.add_argument('-v', '--version',
                         action='version',
-                        version=f'{__title__} (version {__version__})')
+                        version=description)
 
     subparsers = parser.add_subparsers(dest='command')
 

@@ -99,7 +99,7 @@ setup(name='crypt4gh',
           'console_scripts': [
               'crypt4gh=crypt4gh.__main__:main',
               'crypt4gh-keygen=crypt4gh.keys.__main__:main',
-              'crypt4gh-install-completion=crypt4gh.completions.__main__:main',
+              'crypt4gh-install-completions=crypt4gh.completions.__main__:main',
           ]
       },
       classifiers=[

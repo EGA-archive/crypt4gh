@@ -12,21 +12,24 @@ static char module_name[] = "sodium";
 static PyObject*
 crypt4gh_chacha20poly1305_encrypt(PyObject* self, PyObject* args)
 {
-    PyObject *ciphersegment_obj, *segment_obj, *key_obj;
-    uint8_t *ciphersegment, *segment, *key;
-    Py_ssize_t ciphersegment_len, segment_len; //, key_len;
+    PyObject *ciphersegment_obj, *segment_obj, *key_obj, *aead_obj;
+    uint8_t *ciphersegment, *segment, *key, *aead;
+    Py_ssize_t ciphersegment_len, segment_len, aead_len;
     unsigned long long clen;
     PyObject* ret;
-    Py_buffer ciphersegment_view, segment_view, key_view;
+    Py_buffer ciphersegment_view, segment_view, key_view, aead_view;
+    long seqnum;
 
     memset(&ciphersegment_view, 0, sizeof(ciphersegment_view));
     memset(&segment_view, 0, sizeof(segment_view));
     memset(&key_view, 0, sizeof(key_view));
+    memset(&aead_view, 0, sizeof(aead_view));
 
-    if (!PyArg_ParseTuple(args, "OOO",
+    if (!PyArg_ParseTuple(args, "OOOO",
 			  &ciphersegment_obj,
 			  &segment_obj,
-			  &key_obj)) {
+			  &key_obj,
+			  &aead_obj)) {
       PyErr_SetString(PyExc_TypeError, "All arguments must be buffer objects");
       return NULL;
     }
@@ -38,8 +41,19 @@ crypt4gh_chacha20poly1305_encrypt(PyObject* self, PyObject* args)
       goto bailout;
     }
 
+    ciphersegment = (uint8_t *)ciphersegment_view.buf;
+    ciphersegment_len = ciphersegment_view.len;
+
     if (PyObject_GetBuffer(segment_obj, &segment_view, PyBUF_SIMPLE) != 0) {
       PyErr_SetString(PyExc_BufferError, "segment buffer must be readable");
+      goto bailout;
+    }
+
+    segment = (uint8_t *)segment_view.buf;
+    segment_len = segment_view.len;
+
+    if (ciphersegment_len < segment_len + CIPHER_DIFF) {
+      PyErr_SetString(PyExc_AssertionError, "Invalid buffer sizes");
       goto bailout;
     }
 
@@ -48,23 +62,27 @@ crypt4gh_chacha20poly1305_encrypt(PyObject* self, PyObject* args)
       goto bailout;
     }
 
-    ciphersegment = (uint8_t *)ciphersegment_view.buf;
-    ciphersegment_len = ciphersegment_view.len;
-    segment = (uint8_t *)segment_view.buf;
-    segment_len = segment_view.len;
     key = (uint8_t *)key_view.buf;
     //key_len = key_view.len;
 
-    if (ciphersegment_len < segment_len + CIPHER_DIFF) {
-      PyErr_SetString(PyExc_AssertionError, "Invalid buffer sizes");
-      goto bailout;
+    if (aead_obj != Py_None){
+      if (PyObject_GetBuffer(aead_obj, &aead_view, PyBUF_SIMPLE) != 0) {
+	PyErr_SetString(PyExc_BufferError, "aead buffer must be readable");
+	goto bailout;
+      }
+      aead = (uint8_t *)aead_view.buf;
+      aead_len = aead_view.len;
+    } else {
+      aead = NULL;
+      aead_len = 0;
     }
 
     randombytes_buf(ciphersegment, NONCE_LEN);
 
     if(crypto_aead_chacha20poly1305_ietf_encrypt(ciphersegment + NONCE_LEN, &clen,
 						 segment, segment_len,
-						 NULL, 0, NULL,
+						 aead, aead_len,
+						 NULL,
 						 ciphersegment, key) != 0){
       PyErr_SetString(PyExc_ValueError, "Segment encryption failed");
       goto bailout;
@@ -77,27 +95,31 @@ bailout:
     PyBuffer_Release(&ciphersegment_view);
     PyBuffer_Release(&segment_view);
     PyBuffer_Release(&key_view);
+    if (aead_obj != Py_None)
+      PyBuffer_Release(&aead_view);
     return ret;
 }
 
 static PyObject*
 crypt4gh_chacha20poly1305_decrypt(PyObject* self, PyObject* args)
 {
-    PyObject *ciphersegment_obj, *segment_obj, *key_obj;
-    uint8_t *ciphersegment, *segment, *key;
-    Py_ssize_t ciphersegment_len, segment_len; //, key_len;
+    PyObject *ciphersegment_obj, *segment_obj, *key_obj, *aead_obj;
+    uint8_t *ciphersegment, *segment, *key, *aead;
+    Py_ssize_t ciphersegment_len, segment_len, aead_len;
     unsigned long long slen;
     PyObject* ret;
-    Py_buffer ciphersegment_view, segment_view, key_view;
+    Py_buffer ciphersegment_view, segment_view, key_view, aead_view;
 
     memset(&ciphersegment_view, 0, sizeof(ciphersegment_view));
     memset(&segment_view, 0, sizeof(segment_view));
     memset(&key_view, 0, sizeof(key_view));
+    memset(&aead_view, 0, sizeof(aead_view));
 
-    if (!PyArg_ParseTuple(args, "OOO",
+    if (!PyArg_ParseTuple(args, "OOOO",
 			  &segment_obj,
 			  &ciphersegment_obj,
-			  &key_obj)) {
+			  &key_obj,
+			  &aead_obj)) {
       PyErr_SetString(PyExc_TypeError, "All arguments must be buffer objects");
       return NULL;
     }
@@ -109,8 +131,20 @@ crypt4gh_chacha20poly1305_decrypt(PyObject* self, PyObject* args)
       goto bailout;
     }
 
+    segment = (uint8_t *)segment_view.buf;
+    segment_len = segment_view.len;
+
     if (PyObject_GetBuffer(ciphersegment_obj, &ciphersegment_view, PyBUF_SIMPLE) != 0) {
       PyErr_SetString(PyExc_BufferError, "ciphersegment buffer must be readable");
+      goto bailout;
+    }
+
+    ciphersegment = (uint8_t *)ciphersegment_view.buf;
+    ciphersegment_len = ciphersegment_view.len;
+
+    if (ciphersegment_len <= CIPHER_DIFF
+	|| segment_len < ciphersegment_len - CIPHER_DIFF) {
+      PyErr_SetString(PyExc_AssertionError, "Invalid buffer sizes");
       goto bailout;
     }
 
@@ -119,23 +153,27 @@ crypt4gh_chacha20poly1305_decrypt(PyObject* self, PyObject* args)
       goto bailout;
     }
 
-    ciphersegment = (uint8_t *)ciphersegment_view.buf;
-    ciphersegment_len = ciphersegment_view.len;
-    segment = (uint8_t *)segment_view.buf;
-    segment_len = segment_view.len;
     key = (uint8_t *)key_view.buf;
     //key_len = key_view.len;
 
-    if (ciphersegment_len <= CIPHER_DIFF
-	|| segment_len < ciphersegment_len - CIPHER_DIFF) {
-      PyErr_SetString(PyExc_AssertionError, "Invalid buffer sizes");
-      goto bailout;
+    if (aead_obj != Py_None){
+      if (PyObject_GetBuffer(aead_obj, &aead_view, PyBUF_SIMPLE) != 0) {
+	PyErr_SetString(PyExc_BufferError, "aead buffer must be readable");
+	goto bailout;
+      }
+      aead = (uint8_t *)aead_view.buf;
+      aead_len = aead_view.len;
+    } else {
+      aead = NULL;
+      aead_len = 0;
     }
+
 
     if(crypto_aead_chacha20poly1305_ietf_decrypt(segment, &slen,
 						 NULL,
 						 ciphersegment + NONCE_LEN, ciphersegment_len - NONCE_LEN,
-						 NULL, 0, ciphersegment /* nonce */, key) != 0){
+						 aead, aead_len,
+						 ciphersegment /* nonce */, key) != 0){
       PyErr_SetString(PyExc_ValueError, "Ciphersegment decryption failed");
       goto bailout;
     }
@@ -147,6 +185,7 @@ bailout:
     PyBuffer_Release(&ciphersegment_view);
     PyBuffer_Release(&segment_view);
     PyBuffer_Release(&key_view);
+    PyBuffer_Release(&aead_view);
     return ret;
 }
 

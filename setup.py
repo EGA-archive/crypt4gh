@@ -84,7 +84,7 @@ class CleanLibsodium():
             subprocess.check_call(['make', 'clean'], cwd=str(LIBSODIUM))
 
 setup(name='crypt4gh',
-      version='1.8.6',
+      version='2.0',
       url='https://www.github.com/EGA-archive/crypt4gh',
       license='Apache License 2.0',
       author='Frédéric Haziza',
@@ -137,8 +137,7 @@ setup(name='crypt4gh',
       ],
       python_requires='>=3.9',
       # See https://packaging.python.org/discussions/install-requires-vs-requirements/
-      install_requires=[ # include version when needed
-          'docopt-ng', 
+      install_requires=[
           'cryptography>=2.8',
           'bcrypt',
       ],

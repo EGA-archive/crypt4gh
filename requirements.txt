@@ -1,4 +1,3 @@
-docopt-ng
 cryptography
 bcrypt
 setuptools

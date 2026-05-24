@@ -15,7 +15,7 @@ from pathlib import Path
 
 from docopt import docopt
 
-from .. import __title__, __version__, PROG
+from .. import __title__, __version__
 from . import c4gh, get_public_key, get_private_key
 
 LOG = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ __doc__ = f'''
 Utility to create Crypt4GH-formatted keys.
 
 Usage:
-   {PROG}-keygen [-hv] [--log <file>] [-f] [--pk <path>] [--sk <path>] [--nocrypt] [-C <comment>] [--relock]
+   crypt4gh-keygen [-hv] [--log <file>] [-f] [--pk <path>] [--sk <path>] [--nocrypt] [-C <comment>] [--relock]
 
 Options:
    -h, --help             Prints this help and exit

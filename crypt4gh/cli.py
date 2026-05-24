@@ -4,103 +4,95 @@ import sys
 import os
 import logging
 from logging.config import dictConfig
+import json
+import argparse
 from functools import partial
 from getpass import getpass
-import re
-import json
 
-from docopt import docopt
-
-from . import __title__, __version__, PROG
-from . import lib, sodium
+from . import __title__, __version__
 from .keys import get_public_key, get_private_key
 
 LOG = logging.getLogger(__name__)
 
-C4GH_DEBUG  = os.getenv('C4GH_DEBUG', False)
+DEFAULT_LOG  = os.getenv('C4GH_LOG', 'NOTSET')
 DEFAULT_SK  = os.getenv('C4GH_SECRET_KEY', None)
-DEFAULT_LOG = os.getenv('C4GH_LOG', None)
 
-__doc__ = f'''
+def parse_args():
 
-Utility for the cryptographic GA4GH standard, reading from stdin and outputting to stdout.
-
-Usage:
-   {PROG} [-hv] [--log <file>] encrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--range <start-end>] [--header <path>]
-   {PROG} [-hv] [--log <file>] decrypt [--sk <path>] [--sender_pk <path>] [--range <start-end>]
-   {PROG} [-hv] [--log <file>] rearrange [--sk <path>] --range <start-end>
-   {PROG} [-hv] [--log <file>] reencrypt [--sk <path>] --recipient_pk <path> [--recipient_pk <path>]... [--trim] [--header-only]
-
-Options:
-   -h, --help             Prints this help and exit
-   -v, --version          Prints the version and exits
-   --log <file>           Path to the logger file (in YML format)
-   --sk <keyfile>         Curve25519-based Private key
-                          When encrypting, if neither the private key nor C4GH_SECRET_KEY are specified, we generate a new key 
-   --recipient_pk <path>  Recipient's Curve25519-based Public key
-   --sender_pk <path>     Peer's Curve25519-based Public key to verify provenance (akin to signature)
-   --range <start-end>    Byte-range either as  <start-end> or just <start> (Start included, End excluded)
-   -t, --trim             Keep only header packets that you can decrypt
-   --header <path>        Where to write the header (default: stdout)
-   --header-only          Whether the input data consists only of a header (default: false)
-
+    parser = argparse.ArgumentParser(prog='crypt4gh',
+                                     description = 'Utility for the cryptographic GA4GH standard, reading from stdin and outputting to stdout.',
+                                     formatter_class = argparse.RawDescriptionHelpFormatter,
+                                     allow_abbrev = False,
+                                     epilog = '''\
 Environment variables:
-   C4GH_LOG         If defined, it will be used as the default logger
-   C4GH_SECRET_KEY  If defined, it will be used as the default secret key (ie --sk ${{C4GH_SECRET_KEY}})
-   C4GH_PASSPHRASE  If defined, it will be used as the passphrase
-                    for decoding the secret key, replacing the callback.
-                    Note: this is insecure. Only used for testing
-   C4GH_DEBUG       If True, it will print (a lot of) debug information.
-                    (Watch out: the output contains secrets)
- 
-'''
+   C4GH_LOG         If defined, it will be used as the default logger level
+   C4GH_SECRET_KEY  If defined, it will be used as the default secret key (ie --sk ${C4GH_SECRET_KEY})
+''')
 
-def parse_args(argv=sys.argv[1:]):
+    parser.add_argument('-v', '--version', action='version', version=f'{__title__} (version {__version__})')
+    parser.add_argument('--log', help='Path to the logger file (in JSON format)')
 
-    version = f'{__title__} (version {__version__})'
-    args = docopt(__doc__, argv, version=version)
+    subparsers = parser.add_subparsers(dest='command', required = True,
+                                       help='use "crypt4gh <command> -h" for help')
+
+    # create the parser for the "encrypt" command
+    parser_encrypt = subparsers.add_parser('encrypt')
+    parser_encrypt.add_argument('-2', action='store_true', dest='v2', default=False,
+                                help='Use version 2')
+    parser_encrypt.add_argument('--passphrase-from-env', metavar='<envvar>', dest='envvar',
+                                help='Read the passphrase from environment variable "envvar".')
+    parser_encrypt.add_argument('--sk', metavar='<path>', dest='sk',
+                                help='Curve25519-based Private key. If missing, and C4GH_SECRET_KEY not specified, a random key is generated')
+    parser_encrypt.add_argument('--recipient-pk', action='append', metavar='<path>', dest='recipients',
+                                help="Recipient's Curve25519-based Public key")
+    parser_encrypt.add_argument('--header', metavar='<path>', dest='header',
+                                help="Where to write the header (default: stdout)")
+
+    # create the parser for the "decrypt" command
+    parser_decrypt = subparsers.add_parser('decrypt')
+    parser_decrypt.add_argument('--passphrase-from-env', metavar='<envvar>', dest='envvar',
+                                help='Read the passphrase from environment variable "envvar".')
+    parser_decrypt.add_argument('--sender-pk', metavar='<path>', dest='sender',
+                                help="Peer's Curve25519-based Public key to verify provenance (akin to signature)")
+    parser_decrypt.add_argument('--sk', metavar='<path>', dest='sk',
+                                help='Curve25519-based Private key (default: environment variable C4GH_SECRET_KEY)')
+
+    # create the parser for the "reencrypt" command
+    parser_reencrypt = subparsers.add_parser('reencrypt')
+    parser_reencrypt.add_argument('-2', action='store_true', dest='v2', default=False,
+                                  help='Use version 2')
+    parser_reencrypt.add_argument('--passphrase-from-env', metavar='<envvar>', dest='envvar',
+                                  help='Read the passphrase from environment variable "envvar".')
+    parser_reencrypt.add_argument('--sk', metavar='<path>', dest='sk',
+                                  help='Curve25519-based Private key (default: environment variable C4GH_SECRET_KEY)')
+    parser_reencrypt.add_argument('--sender-pk', metavar='<path>', dest='sender',
+                                  help="Peer's Curve25519-based Public key to verify provenance (akin to signature)")
+    parser_reencrypt.add_argument('--recipient-pk', action='append', metavar='<path>', dest='recipients',
+                                  help="Recipient's Curve25519-based Public key")
+    parser_reencrypt.add_argument('--header-only', action='store_true', dest='header_only', default=False,
+                                  help='Whether the input data consists only of a header (default: false)')
+    parser_reencrypt.add_argument('--chunk-size', metavar='<size>', dest='chunksize', type=int, default=1<<23,
+                                  help='Buffer transfer size (in bytes)')
+
+    args = parser.parse_args(sys.argv[1:])
 
     # Logging for the root logger
     logging.basicConfig(stream=sys.stderr,
-                        level=logging.DEBUG if C4GH_DEBUG else logging.CRITICAL,
-                        format='[%(levelname)s] %(message)s')
+                        level=logging.getLevelName(DEFAULT_LOG),
+                        format='[%(module)s][%(levelname)s] %(message)s')
 
-    logger = args['--log'] or DEFAULT_LOG
-    if logger and os.path.exists(logger):
-        with open(logger, 'rt') as stream:
+    if args.log and os.path.exists(args.log):
+        with open(args.log, 'rt') as stream:
             dictConfig(json.load(stream))
 
-    # I prefer to clean up
-    for s in ['--log', '--help', '--version']:#, 'help', 'version']:
-        del args[s]
-
-    # print(args)
     return args
 
 
-range_re = re.compile(r'([\d]+)-([\d]+)?')
-
-def parse_range(args):
-    r = args['--range']
-    if not r:
-        return (0, None)
-
-    m = range_re.match(r)
-    if m is None:
-        raise ValueError(f"Invalid range: {args['--range']}")
-    
-    start, end = m.groups()  # end might be None
-    start, end = int(start), (int(end) if end else None)
-    span = end - start - 1 if end else None
-    if not span:
-        raise ValueError(f"Invalid range: {args['--range']}")
-    return (start, span)
-
 def retrieve_private_key(args, generate=False):
 
-    seckey = args['--sk'] or DEFAULT_SK
+    seckey = args.sk or DEFAULT_SK
 
-    if generate and seckey is None: # generate a one on the fly
+    if generate and seckey is None: # generate one on the fly
         skey = os.urandom(32)
         LOG.debug('Generating Private Key: %s', skey.hex().upper())
         return skey
@@ -109,114 +101,38 @@ def retrieve_private_key(args, generate=False):
     if not os.path.exists(seckeypath):
         raise ValueError('Secret key not found')
 
-    passphrase = os.getenv('C4GH_PASSPHRASE')
-    if passphrase:
-        #LOG.warning("Using a passphrase in an environment variable is insecure")
-        print("Warning: Using a passphrase in an environment variable is insecure", file=sys.stderr)
-        cb = lambda : passphrase
-    else:
-        cb = partial(getpass, prompt=f'Passphrase for {seckey}: ')
+    cb = partial(getpass, prompt=f'Passphrase for {seckey}: ')
+
+    if args.envvar:
+        passphrase = os.getenv(args.envvar)
+        if passphrase:
+            cb = lambda : passphrase # reset
 
     return get_private_key(seckeypath, cb)
 
-def encrypt(args):
-    assert( args['encrypt'] )
 
-    range_start, range_span = parse_range(args)
+def retrieve_recipients(args):
 
-    seckey = retrieve_private_key(args, generate=True)
+    # handle repetitions with a set,
+    # in case different filenames are used for the same key
+    recipient_keys = set()
 
-    def build_recipients():
-        for pk in args['--recipient_pk']:
-            recipient_pubkey = os.path.expanduser(pk)
-            if not os.path.exists(recipient_pubkey):
-                print(f"Recipient pubkey: {recipient_pubkey}, does not exist", file=sys.stderr)
-                continue
-            LOG.debug("Recipient pubkey: %s", recipient_pubkey)
-            yield (0, seckey, get_public_key(recipient_pubkey))
+    for pk in (args.recipients or []):
+        recipient_pubkey = os.path.expanduser(pk)
+        if not os.path.exists(recipient_pubkey):
+            print(f"Recipient pubkey: {recipient_pubkey}, does not exist", file=sys.stderr)
+            continue
+        LOG.debug("Recipient pubkey: %s", recipient_pubkey)
+        recipient_keys.add( get_public_key(recipient_pubkey) )
 
-    # keys = list of (method, privkey, recipient_pubkey=None)
-    # using a set now, instead of inside the generator loop
-    # because we'd remove repetition in case different filenames are used for the same key
-    recipient_keys = set(build_recipients()) # must have at least one, remove repetitions
     if not recipient_keys:
         raise ValueError("No Recipients' Public Key found")
 
-    header = args["--header"]
+    return recipient_keys
 
-    try:
-        if header:
-            header = open(header, 'wb') # let it raise exception
-        lib.encrypt(recipient_keys,
-                    sys.stdin.buffer,
-                    sys.stdout.buffer,
-                    headerfile = header,
-                    offset = range_start,
-                    span = range_span)
-    finally:
-        if header:
-            header.close()
-    
+def retrieve_sender(args):
 
-def decrypt(args):
-    assert( args['decrypt'] )
+    if args.sender:
+        return get_public_key(os.path.expanduser(args.sender))
 
-    sender_pubkey = get_public_key(os.path.expanduser(args['--sender_pk'])) if args['--sender_pk'] else None
-
-    range_start, range_span = parse_range(args)
-
-    seckey = retrieve_private_key(args)
-
-    keys = [(0, seckey, None)] # keys = list of (method, privkey, recipient_pubkey=None)
-
-    lib.decrypt(keys,
-                sys.stdin.buffer,
-                sys.stdout.buffer,
-                offset = range_start,
-                span = range_span,
-                sender_pubkey=sender_pubkey)
-
-
-def rearrange(args):
-    assert( args['rearrange'] )
-
-    range_start, range_span = parse_range(args)
-
-    seckey = retrieve_private_key(args)
-    pubkey = sodium.derive_pk(seckey)
-
-    keys = [(0, seckey, pubkey)] # keys = list of (method, privkey, recipient_pubkey=ourselves)
-
-    lib.rearrange(keys,
-                  sys.stdin.buffer,
-                  sys.stdout.buffer,
-                  offset = range_start,
-                  span = range_span)
-
-def reencrypt(args):
-    assert( args['reencrypt'] )
-
-    seckey = retrieve_private_key(args)
-
-    def build_recipients():
-        for pk in args['--recipient_pk']:
-            recipient_pubkey = os.path.expanduser(pk)
-            if not os.path.exists(recipient_pubkey):
-                print(f"Recipient pubkey: {recipient_pubkey}, does not exist", file=sys.stderr)
-                continue
-            LOG.debug("Recipient pubkey: %s", recipient_pubkey)
-            yield (0, seckey, get_public_key(recipient_pubkey))
-
-    # keys = list of (method, privkey, recipient_pubkey=None)
-    # using a set now, instead of inside the generator loop
-    # because we'd remove repetition in case different filenames are used for the same key
-    recipient_keys = set(build_recipients()) # must have at least one, remove repetitions
-    if not recipient_keys:
-        raise ValueError("No Recipients' Public Key found")
-
-    lib.reencrypt([(0, seckey, None)], # sender_keys
-                  recipient_keys,
-                  sys.stdin.buffer,
-                  sys.stdout.buffer,
-                  trim=args['--trim'],
-                  header_only=args['--header-only'])
+    return None

@@ -37,7 +37,7 @@ cryptographic file format."""
 
 
 __title__ = 'GA4GH cryptographic utilities'
-__version__ = '1.8.6' # VERSION in header is 1 (as 4 bytes little endian)
+__version__ = '2.0' # package version, not Crypt4GH
 __author__ = 'Frédéric Haziza'
 __author_email__ = 'silverdaz@gmail.com'
 __license__ = 'Apache License 2.0'
@@ -50,7 +50,7 @@ import logging
 LOG = logging.getLogger(__name__)
 
 # For this verion: Data blocks are bounded to that specific size
-VERSION = 1
+SUPPORTED_VERSIONS = (1,2)
 SEGMENT_SIZE = 65536
 
 CIPHER_DIFF = 28 # nonce: 12 + mac: 16 

@@ -210,44 +210,90 @@ def decrypt(infile, outfile,
 import os
 import posix
 import errno
+import shutil
 
-def fastcopy(source_fd, target_fd,
-             read_source,
-             write_target,
-             chunksize):
+def fastcopy(fsrc, fdst, chunksize):
 
-    # Use OS fast copy where available.
-    if hasattr(posix, '_fcopyfile'):
-        LOG.debug('Trying posix fcopyfile')
-        try:
-            posix._fcopyfile(source_fd, target_fd, posix._COPYFILE_DATA)
+    # adapted from https://github.com/python/cpython/blob/3.13/Lib/shutil.py
+
+    try:
+
+        # macOS
+        if shutil._HAS_FCOPYFILE:
+            LOG.debug('Trying shutil._fastcopy_fcopyfile')
+            shutil._fastcopy_fcopyfile(fsrc, fdst, posix._COPYFILE_DATA)
             return
-        except OSError as e:
-            LOG.error('posix._fcopyfile: %r', e)
-            if e.errno not in (errno.EINVAL, errno.ENOTSUP):
-                raise
-
-    if hasattr(os, '_copy_file_range'): 
-        LOG.debug('Trying os copy_file_range')
-        try:
-            os._copy_file_range(source_fd, target_fd)
+        # Linux
+        elif shutil._USE_CP_SENDFILE:
+            LOG.debug('Trying shutil._fastcopy_sendfile')
+            shutil._fastcopy_sendfile(fsrc, fdst)
             return
-        except OSError as e: 
-            LOG.error('os._copy_file_range: %r', e)
-            if e.errno not in (errno.ETXTBSY, errno.EXDEV):
-                raise
+        # Windows, see:
+        elif shutil._WINDOWS:
+            LOG.debug('Windows plateform')
+            try:
+                src_filesize = os.fstat(fsrc.fileno()).st_size
+            except OSError:
+                src_filesize = None
+            if src_filesize:
+                LOG.debug('Trying shutil._copyfileobj_readinto')
+                shutil._copyfileobj_readinto(fsrc, fdst, min(src_filesize, shutil.COPY_BUFSIZE))
+                return
 
-    if hasattr(os, '_sendfile'): 
-        LOG.debug('Trying os sendfile')
-        try:
-            os._sendfile(source_fd, target_fd)
-            return
-        except OSError as e:
-            LOG.error('os._sendfile: %r', e)
-            if e.errno != errno.ENOTSOCK:
-                raise
+        raise ValueError('No Fast-Copy')
 
-    # fallback
-    LOG.debug('Fallback: copy buffer size: %s', chunksize)
-    while buf := read_source(chunksize):
-        write_target(buf)
+    except shutil._GiveupOnFastCopy as e:
+        LOG.error('Fast-Copy error: %s', e)
+        raise ValueError('Fast-Copy failed')
+
+
+
+# def fastcopy(source_fd, target_fd, chunksize):
+
+#     LOG.debug('Chunk size: %s', chunksize)
+
+#     # Use OS fast copy where available.
+#     if hasattr(posix, '_fcopyfile'):
+#         LOG.debug('Trying posix fcopyfile')
+#         try:
+#             out = posix._fcopyfile(source_fd, target_fd, posix._COPYFILE_DATA)
+#             LOG.debug('Output: %s', out)
+#             return
+#         except OSError as e:
+#             LOG.error('posix._fcopyfile: %r', e)
+#             if e.errno not in (errno.EINVAL, errno.ENOTSUP):
+#                 raise
+
+#     if hasattr(os, '_copy_file_range'): 
+#         LOG.debug('Trying os copy_file_range')
+#         try:
+#             out = os._copy_file_range(source_fd, target_fd)
+#             LOG.debug('Output: %s', out)
+#             return
+#         except OSError as e: 
+#             LOG.error('os._copy_file_range: %r', e)
+#             if e.errno not in (errno.ETXTBSY, errno.EXDEV):
+#                 raise
+            
+#     if hasattr(os, '_sendfile'): 
+#         LOG.debug('Trying os sendfile')
+#         try:
+#             out = os._sendfile(source_fd, target_fd)
+#             LOG.debug('Output: %s', out)
+#             return
+#         except OSError as e:
+#             LOG.error('os._sendfile: %r', e)
+#             if e.errno != errno.ENOTSOCK:
+#                 raise
+
+#     if hasattr(os, 'splice'): 
+#         try:
+#             while os.splice(source_fd, target_fd, chunksize, flags=os.SPLICE_F_MOVE | os.SPLICE_F_MORE):
+#                 pass
+#             return
+#         except OSError as e:
+#             LOG.error('os.splice: %r', e)
+#             if e.errno not in (errno.EINVAL, errno.ENOTSUP, errno.EXDEV):
+#                 raise
+
+#     raise ValueError('Fast-Copy failed')

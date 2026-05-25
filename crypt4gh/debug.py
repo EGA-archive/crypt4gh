@@ -5,8 +5,6 @@ import sys
 import os
 import logging
 from logging.config import dictConfig
-from functools import partial
-from getpass import getpass
 import json
 from datetime import datetime
 import argparse
@@ -27,7 +25,7 @@ DEFAULT_SK  = os.getenv('C4GH_SECRET_KEY', None)
 
 def parse_args():
 
-    parser = argparse.ArgumentParser(prog='crypt4gh',
+    parser = argparse.ArgumentParser(#prog='crypt4gh-debug',
                                      description = 'Debugging utility for the cryptographic GA4GH standard, reading from stdin and outputting to stdout.',
                                      formatter_class = argparse.RawDescriptionHelpFormatter,
                                      allow_abbrev = False,
@@ -37,7 +35,7 @@ Environment variables:
    C4GH_SECRET_KEY  If defined, it will be used as the default secret key (ie --sk ${C4GH_SECRET_KEY})
 ''')
 
-    parser.add_argument('-v', '--version', action='version', version=f'{__title__} (version {__version__})')
+    parser.add_argument('-v', '--version', action='version', version=f'[DEBUG] {__title__} (version {__version__})')
     parser.add_argument('--log', help='Path to the logger file (in JSON format)')
 
     parser.add_argument('--passphrase-from-env', metavar='<envvar>', dest='envvar',

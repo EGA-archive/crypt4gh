@@ -70,8 +70,20 @@ def reencrypt(args):
     seckey = cli.retrieve_private_key(args)
     sender_pubkey = cli.retrieve_sender(args)
 
-    infile = sys.stdin.buffer
-    outfile = sys.stdout.buffer
+    has_infile = False
+    has_outfile = False
+
+    if args.infile:
+        has_infile = True
+        infile = open(args.infile, 'rb')
+    else:
+        infile = sys.stdin.buffer
+
+    if args.outfile:
+        has_outfile = True
+        outfile = open(args.outfile, 'wb')
+    else:
+        outfile = sys.stdout.buffer
 
     # Decrypt and re-encrypt the header
     h = header.reencrypt(infile, seckey, recipient_keys,
@@ -88,14 +100,27 @@ def reencrypt(args):
         LOG.info(f'Header-only reencryption successful')
         return
     
-    # Stream the remainder
     LOG.info('Streaming the remainder of the file')
-    LOG.debug('Chunk size: %s', args.chunksize)
+    if has_infile and has_outfile:
+        try:
+            payload.fastcopy(infile, outfile, args.chunksize)
+            LOG.info('Fast re-encryption successful')
+            return
+        except Exception as e:
+            LOG.error('Fast copy error: %r', e)
 
-    payload.fastcopy(sys.stdin.fileno(), sys.stdout.fileno(),
-                     sys.stdin.buffer.read, sys.stdout.buffer.write,
-                     args.chunksize)
-    LOG.info('Re-encryption successful')
+    LOG.info('Buffer copy: %s bytes', args.chunksize)
+    # Localize variable access to minimize overhead.
+    in_read = infile.read
+    out_write = outfile.write
+    chunksize = args.chunksize
+    while buf := in_read(chunksize):
+        out_write(buf)
+
+    if has_infile:
+        infile.close()
+    if has_outfile:
+        outfile.close()
 
 
 def main():

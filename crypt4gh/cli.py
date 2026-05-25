@@ -76,6 +76,10 @@ Environment variables:
                                   help='Whether the input data consists only of a header (default: false)')
     parser_reencrypt.add_argument('--chunk-size', metavar='<size>', dest='chunksize', type=int, default=1<<23,
                                   help='Buffer transfer size (in bytes)')
+    parser_reencrypt.add_argument('--infile', metavar="<path>", dest='infile',
+                                  help='input file. Allows fast-copies')
+    parser_reencrypt.add_argument('--outfile', metavar="<path>", dest='outfile',
+                                  help='output file. Allows fast-copies')
 
     args = parser.parse_args(sys.argv[1:])
 

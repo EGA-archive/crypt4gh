@@ -29,13 +29,15 @@ in the sauna!
 Dinner 
 at 7pm?
 EOF
+    unset C4GH_PASSPHRASE
 
     # Alice decrypts it
-    export C4GH_PASSPHRASE=${ALICE_PASSPHRASE}
-    crypt4gh decrypt --sk ${ALICE_SECKEY} < $TESTFILES/message.bob.c4gh > $TESTFILES/message.alice
+    crypt4gh decrypt --passphrase-from-env ALICE_PASSPHRASE \
+    	     	     --sk ${ALICE_SECKEY} \
+		     < $TESTFILES/message.bob.c4gh \
+		     > $TESTFILES/message.alice
 
     run diff $TESTFILES/message.bob $TESTFILES/message.alice
     [ "$status" -eq 0 ]
 
-    unset C4GH_PASSPHRASE
 }

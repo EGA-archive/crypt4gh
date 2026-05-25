@@ -13,8 +13,7 @@ from functools import partial
 from getpass import getpass
 
 from crypt4gh.keys import get_private_key, get_public_key
-from crypt4gh import header, lib, SEGMENT_SIZE
-from crypt4gh.lib import sodium
+from crypt4gh import sodium, header, payload
 
 if __name__ == '__main__':
 
@@ -57,15 +56,18 @@ if __name__ == '__main__':
     else:
         cb = partial(getpass, prompt=f'Passphrase for {seckey}: ')
 
-    seckey = get_private_key(seckeypath, cb)
-
 
     recipient_pubkey = os.path.expanduser(sys.argv[2])
     if not os.path.exists(recipient_pubkey):
         raise ValueError("Recipient's Public Key not found")
     recipient_pubkey = get_public_key(recipient_pubkey)
 
-    keys = [(0, seckey, recipient_pubkey)]
+    seckey = get_private_key(seckeypath, cb)
+    pubkey = sodium.derive_pk(seckey)
+
+    version = 1
+    if len(sys.argv) > 3 and sys.argv[3] == '-2':
+        version = 2
 
     #############################################################
     # Preparing the encryption engine
@@ -73,32 +75,20 @@ if __name__ == '__main__':
     encryption_method = 0 # only choice for this version
     session_key = os.urandom(32) # we use one session key for all blocks
 
-    #############################################################
-    # Output the header
-    #############################################################
-    packets = [ header.make_packet_data_enc(encryption_method, session_key),
-                header.make_packet_data_edit_list(edits) ]
-    header_packets = [encrypted_packet for packet in packets for encrypted_packet in header.encrypt(packet, keys)]
-    header_bytes = header.serialize(header_packets)
-    sys.stdout.buffer.write(header_bytes)
+    seqnum = None
+    if version == 2:
+        seqnum = int.from_bytes(os.urandom(8), byteorder='little', signed=False)
 
     #############################################################
-    # Output the message
+    # Output the header + message
     #############################################################
     infile = io.BytesIO(message)
     outfile = sys.stdout.buffer
-    
-    segment = bytearray(SEGMENT_SIZE)
-    ciphersegment = bytearray(lib.CIPHER_SEGMENT_SIZE)
-    while True:
-        segment_len = infile.readinto(segment)
 
-        if segment_len == 0: # finito
-            break
+    h = header.construct(version, seckey, [recipient_pubkey],
+                         session_key, seqnum, edits, None, None)
 
-        clen = sodium.chacha20poly1305_encrypt(ciphersegment,
-                                               segment[:segment_len],
-                                               memoryview(session_key))
-        outfile.write(ciphersegment[:clen])
+    outfile.write(h)
 
+    payload.encrypt(infile, outfile, session_key, None) # if seqnum is None => v1, else v2
 

@@ -2,10 +2,13 @@
 """Handle the encryption of the application data."""
 
 import logging
+from datetime import datetime
+import time
 
 from . import SEGMENT_SIZE, CIPHER_DIFF, CIPHER_SEGMENT_SIZE
 from .sodium import (chacha20poly1305_encrypt as segment_encrypt,
                      chacha20poly1305_decrypt as segment_decrypt)
+from .fetcher import fetcher
 
 LOG = logging.getLogger(__name__)
 
@@ -47,7 +50,7 @@ def encrypt(infile, outfile, session_key, start):
 
         dlen = infile.readinto(segment)
         if dlen == 0: # no more data
-            if seqnum_start is not None: # one more "empty" segment
+            if start is not None: # one more "empty" segment
                 clen = segment_encrypt(ciphersegment, b'', session_key, next(snum))
                 outfile.write(ciphersegment[:clen])
             break
@@ -185,7 +188,16 @@ class LimitedOutput():
 
 
 
-def decrypt(infile, outfile, session_keys, edit_list, version=1):
+def decrypt(infile, outfile,
+            session_keys, edit_list, link,
+            version=1):
+
+    # Infile in now positioned at the beginning of the data portion
+    # or we fetch the data portion from the URI.
+    if link:
+        # replacing the infile with a fetcher
+        infile = fetcher(link)
+        # Note: the remainder of the infile might not be empty, and therefore discarded
 
     if edit_list is None:
         return _decrypt(infile, outfile, session_keys, version=version)

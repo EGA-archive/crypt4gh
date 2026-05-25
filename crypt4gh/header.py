@@ -125,9 +125,10 @@ def serialize(version, writer_pubkey, packets):
 # Packet types
 # -------------------------------------
 
-PACKET_TYPE_DATA_ENC = b'\x00\x00\x00\x00'  # 0 little endian
+PACKET_TYPE_DATA_ENC  = b'\x00\x00\x00\x00' # 0 little endian
 PACKET_TYPE_EDIT_LIST = b'\x01\x00\x00\x00' # 1 little endian
-
+PACKET_TYPE_TIMESTAMP = b'\x02\x00\x00\x00' # 2 little endian
+PACKET_TYPE_LINK      = b'\x03\x00\x00\x00' # 3 little endian
 
 # -------------------------------------
 # Encrypted data packet
@@ -150,14 +151,16 @@ def make_packet_data_enc(session_key, seqnum):
 def parse_packet_data_enc(packet):
     encryption_method = int.from_bytes(packet[0:4], byteorder='little')
     if encryption_method == 0:
-        assert len(packet) == 36, f"Invalid packet length (method: {encryption_method})"
+        if len(packet) < 36:
+            raise f"Data Encryption Packet too short (method: {encryption_method})"
         session_key = packet[4:]
         return (0, session_key, None)
 
     if encryption_method == 1:
-        assert len(packet) == 44, f"Invalid packet length (method: {encryption_method})"
+        if len(packet) < 44:
+            raise f"Data Encryption Packet too short (method: {encryption_method})"
         session_key = packet[4:36]
-        seqnum = int.from_bytes(packet[36:], byteorder='little', signed=False)
+        seqnum = int.from_bytes(packet[36:44], byteorder='little', signed=False)
         return (1, session_key, seqnum)
 
     raise ValueError(f'Unsupported bulk encryption method: {encryption_method}')
@@ -193,6 +196,30 @@ def parse_packet_edit_list(packet):
         raise ValueError('Invalid edit list')
     return (int.from_bytes(packet[i:i+8], byteorder='little') for i in range(4, nb_lengths * 8, 8)) # generator
 
+
+# -------------------------------------
+# Timestamp packet
+# -------------------------------------
+def make_packet_timestamp(timestamp):
+    return (PACKET_TYPE_TIMESTAMP
+            + int(timestamp).to_bytes(8,'little')) # we drop the milliseconds
+
+def parse_packet_timestamp(packet):
+    if len(packet) != 8:
+        raise ValueError('Invalid timestamp packet length')
+    # return datetime.datetime.fromtimestamp(int.from_bytes(packet, byteorder='little'))
+    return int.from_bytes(packet, byteorder='little')
+
+# -------------------------------------
+# link packet
+# -------------------------------------
+def make_packet_link(link):
+    return (PACKET_TYPE_LINK
+            + link.encode())
+
+def parse_packet_link(packet):
+    return packet.decode()
+
 # -------------------------------------
 # Header Encryption Methods Conventions
 # -------------------------------------
@@ -206,10 +233,10 @@ def encrypt_X25519_Chacha20_Poly1305(data, seckey, pubkey, recipient_pubkey):
     # X25519 shared key
     shared_key = sodium.kx_server(pubkey, seckey, recipient_pubkey)
 
-    LOG.debug('    my secret key: %s', seckey.hex())
-    LOG.debug('    my public key: %s', pubkey.hex())
-    LOG.debug(' recipient pubkey: %s', recipient_pubkey.hex())
-    LOG.debug('       shared key: %s', shared_key.hex())
+    # LOG.debug('    my secret key: %s', seckey.hex())
+    # LOG.debug('    my public key: %s', pubkey.hex())
+    # LOG.debug(' recipient pubkey: %s', recipient_pubkey.hex())
+    # LOG.debug('       shared key: %s', shared_key.hex())
 
     encrypted_data = bytearray(len(data) + CIPHER_DIFF)
     # Chacha20_Poly1305 (including nonce), no AEAD
@@ -222,11 +249,11 @@ def decrypt_X25519_Chacha20_Poly1305(packet, seckey, pubkey, peer_pubkey):
     # X25519 shared key
     shared_key = sodium.kx_client(pubkey, seckey, peer_pubkey)
 
-    LOG.debug('    my secret key: %s', seckey.hex())
-    LOG.debug('    my public key: %s', pubkey.hex())
-    LOG.debug('      peer pubkey: %s', peer_pubkey.hex())
-    LOG.debug('       shared key: %s', shared_key.hex())
-    LOG.debug('   encrypted data: [%d] %s', len(packet), packet.hex())
+    # LOG.debug('    my secret key: %s', seckey.hex())
+    # LOG.debug('    my public key: %s', pubkey.hex())
+    # LOG.debug('      peer pubkey: %s', peer_pubkey.hex())
+    # LOG.debug('       shared key: %s', shared_key.hex())
+    # LOG.debug('   encrypted data: [%d] %s', len(packet), packet.hex())
 
     decrypted_data = bytearray(len(packet)) # larger then needed
     plen = sodium.chacha20poly1305_decrypt(decrypted_data, packet, shared_key, None)
@@ -237,18 +264,63 @@ def decrypt_X25519_Chacha20_Poly1305(packet, seckey, pubkey, peer_pubkey):
 # Header Encryption Methods wrappers
 # -------------------------------------
 
-def construct(version, session_key, seqnum, seckey, recipient_keys):
+def construct(version, seckey, recipient_keys,
+              session_key, seqnum, edits, expiration, link):
     assert ((version == 1 and seqnum is None)
             or
             (version == 2 and isinstance(seqnum, int))), "Invalid parameters"
-    packet = make_packet_data_enc(session_key, seqnum)
-    pubkey = sodium.derive_pk(seckey)
 
+    LOG.debug('Constructing Crypt4GH header (v%s) | SeqNum: %s', version, seqnum)
+    packets = [make_packet_data_enc(session_key, seqnum)]
+    if expiration is not None:
+        packets.append( make_packet_timestamp(expiration) )
+    if link is not None:
+        packets.append( make_packet_link(link) )
+    if edits is not None:
+        packets.append( make_packet_edit_list(edits) )
+
+    pubkey = sodium.derive_pk(seckey)
     encrypted_packets = []
-    for recipient_pubkey in recipient_keys:
-        encrypted_packets.append( encrypt_X25519_Chacha20_Poly1305(packet, seckey, pubkey, recipient_pubkey) )
+    for packet in packets:
+        for recipient_pubkey in recipient_keys:
+            encrypted_packets.append( encrypt_X25519_Chacha20_Poly1305(packet, seckey, pubkey, recipient_pubkey) )
 
     return serialize(version, pubkey, encrypted_packets)
+
+def check_integrity(packets):
+
+    has_timestamp = False
+    has_link = False
+    has_edit_list = False
+
+    for packet in packets:
+
+        packet_type = packet[:4]
+
+        if packet_type == PACKET_TYPE_DATA_ENC:
+            pass
+
+        elif packet_type == PACKET_TYPE_EDIT_LIST:
+            if has_edit_list: # reject files if many edit list packets
+                raise ValueError('Invalid file: Too many edit list packets')
+            has_edit_list = True
+
+        elif packet_type == PACKET_TYPE_TIMESTAMP:
+            if has_timestamp: # reject files if many timestamp
+                raise ValueError('Invalid file: Too many timestamp packets')
+            has_timestamp = True
+            expiration = parse_packet_timestamp(packet[4:])
+            if time.time() > expiration: # now > expiration
+                raise ValueError(f'Expired on {datetime.fromtimestamp(expiration)}')
+
+        elif packet_type == PACKET_TYPE_LINK:
+            if has_link: # reject files if many links
+                raise ValueError('Invalid file: Too many links')
+            has_link = True
+
+        else: # Bark if unsupported packet. Don't just ignore it
+            packet_type = int.from_bytes(packet_type, byteorder='little')
+            raise ValueError(f'Invalid packet type {packet_type}')
 
 
 def decrypt(encrypted_packets, seckey, pubkey):
@@ -271,19 +343,13 @@ def decrypt(encrypted_packets, seckey, pubkey):
             LOG.error('X25519 Packet Decryption failed: %s', e)
             ignored_packets.append(packet)
 
+    check_integrity(decrypted_packets)
+
     return (decrypted_packets, ignored_packets)
 
 
 def deconstruct(infile, seckey, sender_pubkey=None):
-    """Retrieve the header from the `infile` stream, and decrypts it.
 
-    Leaves the infile stream right after the header.
-
-    :return: a pair with a list of session keys and a generator of lengths from an edit list (or None if there was no edit list).
-    :rtype: (list of bytes, int generator or None)
-
-    :raises: ValueError if the header could not be decrypted
-    """
     pubkey = sodium.derive_pk(seckey)
 
     version = get_version(infile)
@@ -293,9 +359,11 @@ def deconstruct(infile, seckey, sender_pubkey=None):
     if not decrypted_packets: # no packets were decrypted
         raise ValueError('No header packet could be decrypted')
 
-    # Parse packets
+    # Parse packets, we already checked the packets' list integrity
     data_encryptions = []
     edit_list = None
+    timestamp = None
+    link = None
 
     for packet in decrypted_packets:
 
@@ -305,15 +373,15 @@ def deconstruct(infile, seckey, sender_pubkey=None):
             data_encryptions.append( parse_packet_data_enc(packet[4:]) )
 
         elif packet_type == PACKET_TYPE_EDIT_LIST:
-            if edit_list is not None: # reject files if many edit list packets
-                raise ValueError('Invalid file: Too many edit list packets')
             edit_list = parse_packet_edit_list(packet[4:])
 
-        else: # Bark if unsupported packet. Don't just ignore it
-            packet_type = int.from_bytes(packet_type, byteorder='little')
-            raise ValueError(f'Invalid packet type {packet_type}')
+        elif packet_type == PACKET_TYPE_TIMESTAMP:
+            timestamp = parse_packet_timestamp(packet[4:])
 
-    return version, data_encryptions, edit_list
+        elif packet_type == PACKET_TYPE_LINK:
+            link = parse_packet_link(packet[4:])
+
+    return (version, data_encryptions, edit_list, timestamp, link)
 
 # -------------------------------------
 # Header Re-Encryption
@@ -321,6 +389,7 @@ def deconstruct(infile, seckey, sender_pubkey=None):
 
 def reencrypt(infile, seckey, recipient_keys,
               sender_pubkey = None,
+              uri = None,
               version = 1):
 
     LOG.info('Reencrypting the header')
@@ -334,9 +403,23 @@ def reencrypt(infile, seckey, recipient_keys,
     if not decrypted_packets:
         raise ValueError('No header packet could be decrypted')
 
-    packets = []
-    for packet in decrypted_packets:
-        for recipient_pubkey in recipient_keys:
-            packets.append( encrypt_X25519_Chacha20_Poly1305(packet, seckey, pubkey, recipient_pubkey) )
+    if uri:
+        LOG.info('Adding new URI packet: %s', uri)
+        packets = [make_packet_link(uri)]
+        # filter out the URI packet. We already check the packets' list integrity
+        for packet in decrypted_packets:
+            if packet[:4] == PACKET_TYPE_LINK:
+                LOG.warning('Ignoring existing link: %s', parse_packet_link(packet[4:]))
+                # don't append, filter it out
+            else: 
+                packets.append(packet)
 
-    return serialize(version, pubkey, packets)
+    else:
+        packets = decrypted_packets
+
+    encrypted_packets = []
+    for packet in packets:
+        for recipient_pubkey in recipient_keys:
+            encrypted_packets.append( encrypt_X25519_Chacha20_Poly1305(packet, seckey, pubkey, recipient_pubkey) )
+
+    return serialize(version, pubkey, encrypted_packets)

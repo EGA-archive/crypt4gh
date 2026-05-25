@@ -11,6 +11,6 @@ ALICE_PUBKEY=${HERE}/alice.pub
 ALICE_SECKEY=${HERE}/alice.sec
 
 # Ya man, they're crazy
-ALICE_PASSPHRASE=alice
-BOB_PASSPHRASE=bob
+export ALICE_PASSPHRASE=alice
+export BOB_PASSPHRASE=bob
 

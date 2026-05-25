@@ -16,6 +16,8 @@ def encrypt(args):
     recipient_keys = cli.retrieve_recipients(args)
     seckey = cli.retrieve_private_key(args, generate=True)
 
+    timestamp = cli.retrieve_expiration(args)
+
     # Construct a header with random session key
     version = 1
     session_key = os.urandom(32)
@@ -29,18 +31,20 @@ def encrypt(args):
         #     import random
         #     seqnum = random.randint(0, 1<<32)
 
-    LOG.debug('Creating Crypt4GH header')
-    h = header.construct(version, session_key, seqnum, seckey, recipient_keys)
+    h = header.construct(version, seckey, recipient_keys,
+                         session_key, seqnum, None, timestamp, args.uri)
 
     infile = sys.stdin.buffer
     outfile = sys.stdout.buffer
 
     if args.header:
+        LOG.debug('Outputting Crypt4GH header to %s', args.header)
         with open(args.header, 'wb') as hf: # let it raise exception on errors
             hf.write(h)
     else:
         outfile.write(h)
 
+    LOG.debug('Encrypting payload')
     return payload.encrypt(infile, outfile, session_key, seqnum) # if seqnum is None => v1, else v2
     
 
@@ -53,10 +57,10 @@ def decrypt(args):
     infile = sys.stdin.buffer
     outfile = sys.stdout.buffer
 
-    version, session_keys, edit_list = header.deconstruct(infile, seckey,
-                                                          sender_pubkey=sender_pubkey)
+    version, data_encryptions, edits, _, link = header.deconstruct(infile, seckey,
+                                                                   sender_pubkey=sender_pubkey)
 
-    return payload.decrypt(infile, outfile, session_keys, edit_list, version=version)
+    return payload.decrypt(infile, outfile, data_encryptions, edits, link, version=version)
 
 
 def reencrypt(args):
@@ -72,12 +76,14 @@ def reencrypt(args):
     # Decrypt and re-encrypt the header
     h = header.reencrypt(infile, seckey, recipient_keys,
                          sender_pubkey = sender_pubkey,
+                         uri = args.uri,
                          version= 2 if args.v2 else 1)
     outfile.write(h)
 
     # If header-only reencryption, we are done.
+    # This might discard remaining data from infile
     if args.header_only:
-        LOG.info(f'Header-only reencryption Successful')
+        LOG.info(f'Header-only reencryption successful')
         return
     
     # Stream the remainder

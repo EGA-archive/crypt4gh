@@ -8,6 +8,7 @@ import json
 import argparse
 from functools import partial
 from getpass import getpass
+from datetime import datetime
 
 from . import __title__, __version__
 from .keys import get_public_key, get_private_key
@@ -47,6 +48,10 @@ Environment variables:
                                 help="Recipient's Curve25519-based Public key")
     parser_encrypt.add_argument('--header', metavar='<path>', dest='header',
                                 help="Where to write the header (default: stdout)")
+    parser_encrypt.add_argument('--expiration', metavar='<data>', dest='expiration',
+                                help="Expiration date (in ISO format)")
+    parser_encrypt.add_argument('--link', metavar='<uri>', dest='uri',
+                                help="Fully Qualified URI Path to the payload location")
 
     # create the parser for the "decrypt" command
     parser_decrypt = subparsers.add_parser('decrypt')
@@ -73,6 +78,8 @@ Environment variables:
                                   help='Whether the input data consists only of a header (default: false)')
     parser_reencrypt.add_argument('--chunk-size', metavar='<size>', dest='chunksize', type=int, default=1<<23,
                                   help='Buffer transfer size (in bytes)')
+    parser_reencrypt.add_argument('--link', metavar='<uri>', dest='uri',
+                                  help="Fully Qualified URI Path to the payload location")
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -84,6 +91,12 @@ Environment variables:
     if args.log and os.path.exists(args.log):
         with open(args.log, 'rt') as stream:
             dictConfig(json.load(stream))
+
+    if args.command == 'encrypt' and args.uri is not None and args.header is None:
+        raise ValueError('encrypt: --link requires --header')
+
+    if args.command == 'reencrypt' and args.uri is not None and not args.header_only:
+        raise ValueError('reencrypt: --link requires --header-only')
 
     return args
 
@@ -135,4 +148,12 @@ def retrieve_sender(args):
     if args.sender:
         return get_public_key(os.path.expanduser(args.sender))
 
+    return None
+
+def retrieve_expiration(args):
+
+    if args.expiration:
+        LOG.debug("expiration: %s", args.expiration)
+        return int(datetime.fromisoformat(args.expiration).timestamp())
+    
     return None

@@ -33,6 +33,7 @@ def get_version(stream):
     # Magic number, 8 bytes
     magic_number = bytes(buf[:8]) # 8 bytes
     if magic_number != MAGIC_NUMBER:
+        LOG.error('Buf: %s', buf.hex())
         raise ValueError('Not a CRYPT4GH formatted file')
 
     # Version, 4 bytes
@@ -373,8 +374,8 @@ def reencrypt(infile, seckey, recipient_keys,
 
     pubkey = sodium.derive_pk(seckey)
 
-    version = get_version(infile)
-    header_packets = parse(infile, version, sender_pubkey=sender_pubkey)
+    org_version = get_version(infile)
+    header_packets = parse(infile, org_version, sender_pubkey=sender_pubkey)
     decrypted_packets, _ = decrypt(header_packets, seckey, pubkey)  # don't bother with ignored packets
 
     if not decrypted_packets:

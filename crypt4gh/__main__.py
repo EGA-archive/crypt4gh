@@ -77,6 +77,9 @@ def reencrypt(args):
     h = header.reencrypt(infile, seckey, recipient_keys,
                          sender_pubkey = sender_pubkey,
                          version= 2 if args.v2 else 1)
+
+    LOG.debug('HEADER: %s', h.hex())
+    
     outfile.write(h)
 
     # If header-only reencryption, we are done.
@@ -99,6 +102,8 @@ def main():
     try:
 
         args = cli.parse_args()
+
+        LOG.debug('Command: %s', args.command)
 
         if args.command == 'encrypt':
             return encrypt(args)

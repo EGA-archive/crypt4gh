@@ -7,44 +7,17 @@ import logging
 from logging.config import dictConfig
 from functools import partial
 from getpass import getpass
-#import traceback
 import json
+from datetime import datetime
+import argparse
 
-from docopt import docopt
-
-from . import __title__, __version__, PROG
-from . import SEGMENT_SIZE
-from .lib import CIPHER_DIFF
-from .keys import get_public_key, get_private_key
-from . import header
+from . import __title__, __version__, CIPHER_SEGMENT_SIZE
+from . import cli, header
 
 LOG = logging.getLogger(__name__)
 
-DEFAULT_SK  = os.getenv('C4GH_SECRET_KEY', '~/.c4gh/key')
-DEFAULT_LOG = os.getenv('C4GH_LOG', None)
-
-__doc__ = f'''
- 
-Utility for the cryptographic GA4GH standard, reading from stdin.
-
-This is only used for debugging
-
-Usage:
-   {PROG}-debug [-hv] [--log <file>] [--sk <path>] [--sender_pk <path>]
-
-Options:
-   -h, --help             Prints this help and exit
-   -v, --version          Prints the version and exits
-   --log <file>           Path to the logger file (in YML format)
-   --sk <keyfile>         Curve25519-based Private key [default: {DEFAULT_SK}]
-   --sender_pk <path>     Peer's Curve25519-based Public key to verify provenance (aka, signature)
-
-
-Environment variables:
-   C4GH_LOG         If defined, it will be used as the default logger
-   C4GH_SECRET_KEY  If defined, it will be used as the default secret key (ie --sk ${{C4GH_SECRET_KEY}})
- 
-'''
+DEFAULT_LOG  = os.getenv('C4GH_LOG', 'NOTSET')
+DEFAULT_SK  = os.getenv('C4GH_SECRET_KEY', None)
 
 ##############################################################
 ##
@@ -52,99 +25,86 @@ Environment variables:
 ##
 ##############################################################
 
-def parse_args(argv=sys.argv[1:]):
+def parse_args():
 
-    version = f'{__title__} (version {__version__})'
-    args = docopt(__doc__, argv, version=version)
+    parser = argparse.ArgumentParser(prog='crypt4gh',
+                                     description = 'Debugging utility for the cryptographic GA4GH standard, reading from stdin and outputting to stdout.',
+                                     formatter_class = argparse.RawDescriptionHelpFormatter,
+                                     allow_abbrev = False,
+                                     epilog = '''\
+Environment variables:
+   C4GH_LOG         If defined, it will be used as the default logger level
+   C4GH_SECRET_KEY  If defined, it will be used as the default secret key (ie --sk ${C4GH_SECRET_KEY})
+''')
 
-    # Logging
-    logger = args['--log'] or DEFAULT_LOG
-    logging.basicConfig(stream=sys.stderr, level=logging.DEBUG) # for the root logger
-    if logger and os.path.exists(logger):
-        with open(logger, 'rt') as stream:
+    parser.add_argument('-v', '--version', action='version', version=f'{__title__} (version {__version__})')
+    parser.add_argument('--log', help='Path to the logger file (in JSON format)')
+
+    parser.add_argument('--passphrase-from-env', metavar='<envvar>', dest='envvar',
+                        help='Read the passphrase from environment variable "envvar".')
+    parser.add_argument('--sk', metavar='<path>', dest='sk',
+                        help='Curve25519-based Private key. If missing, and C4GH_SECRET_KEY not specified, a random key is generated')
+    parser.add_argument('--sender-pk', metavar='<path>', dest='sender',
+                        help="Peer's Curve25519-based Public key to verify provenance (akin to signature)")
+
+
+    args = parser.parse_args(sys.argv[1:])
+
+    # Logging for the root logger
+    logging.basicConfig(stream=sys.stderr,
+                        level=logging.getLevelName(DEFAULT_LOG),
+                        format='[%(module)s][%(levelname)s] %(message)s')
+
+    if args.log and os.path.exists(args.log):
+        with open(args.log, 'rt') as stream:
             dictConfig(json.load(stream))
 
-    # I prefer to clean up
-    for s in ['--log', '--help', '--version']:#, 'help', 'version']:
-        del args[s]
-
-    # print(args)
     return args
 
 
-def output(args):
+def run(args):
 
-    seckey = args['--sk'] or DEFAULT_SK
-    seckeypath = os.path.expanduser(seckey)
-    if not os.path.exists(seckeypath):
-        raise ValueError('Secret key not found')
-
-    passphrase = os.getenv('C4GH_PASSPHRASE')
-    if passphrase:
-        #LOG.warning("Using a passphrase in an environment variable is insecure")
-        print("Warning: Using a passphrase in an environment variable is insecure", file=sys.stderr)
-        cb = lambda : passphrase
-    else:
-        cb = partial(getpass, prompt=f'Passphrase for {seckey}: ')
-
-    seckey = get_private_key(seckeypath, cb)
-
-    sender_pubkey = get_public_key(os.path.expanduser(args['--sender_pk'])) if args['--sender_pk'] else None
+    seckey = cli.retrieve_private_key(args)
+    sender_pubkey = cli.retrieve_sender(args)
 
     infile = sys.stdin.buffer
-    keys = [(0, seckey, None)]
+    outfile = sys.stdout.buffer
 
-    edits = None
-    for i, packet in enumerate(header.parse(infile), start=1):
+    version, data_encryptions, edits, timestamp = header.deconstruct(infile, seckey,
+                                                                     sender_pubkey=sender_pubkey)
 
-        decrypted_packet = header.decrypt_packet(packet, keys, sender_pubkey=sender_pubkey)
-        if decrypted_packet is None: # They all failed
-            print('# packet not decryptable')
-            continue
-
-        # Here is a packet
-
-        packet_type = decrypted_packet[:4]
-        packet_content = decrypted_packet[4:]
-            
-        if packet_type == header.PACKET_TYPE_DATA_ENC:
-            LOG.debug(f'# packet {i} content: {packet_content.hex()}')
-            session_key = header.parse_enc_packet(packet_content)
-            print(f'# packet {i} session key: {session_key.hex()}')
-
-        elif packet_type == header.PACKET_TYPE_EDIT_LIST:
-            if edits is not None: # reject files if many edit list packets
-                raise ValueError('Invalid file: Too many edit list packets')
-            edits = packet_content, i
-
+    print('# Header version:', version)
+    print('# Data encryption packets')
+    for method, session_key, seqnum in data_encryptions:
+        if method == 0:
+            assert seqnum is None, "Invalid data encryption packet"
+            print('   * session key:', session_key.hex())
+        elif method == 1:
+            print('   * session key:', session_key.hex())
+            print('           start:', seqnum)
         else:
-            packet_type = int.from_bytes(packet_type, byteorder='little')
-            print(f'Packet {i}: Invalid packet (type: {packet_type})')
-
+            print('   * medthod:', method, '|', session_key, '|', seqnum)
 
     if edits is not None:
-        LOG.debug(f'# Packet {edits[1]} Edit list: {edits[0].hex()}')
-        edit_list = list(header.parse_edit_list_packet(edits[0]))
-        print(f'# Packet {edits[1]} Edit list: {edit_list}')
+        print('# Edit list:', edits)
 
+    if timestamp is not None:
+        expiration = datetime.fromtimestamp(timestamp)
+        print('# Expiration:', expiration)
 
     # Scanning through the remainder and print the number of data blocks
-    chunk_size = SEGMENT_SIZE + CIPHER_DIFF # chunk = cipher segment
     count = 0
-    while True:
-        segment = infile.read(chunk_size)
-        if not segment:
-            break
+    while segment := infile.read(CIPHER_SEGMENT_SIZE):
         count +=1
 
-    print(f'# The data section contains {count} blocks')
+    print('# The data section contains', count, 'blocks')
 
 
 
-def main(argv=sys.argv[1:]):
+def main():
     try:
-        args = parse_args(argv)
-        output(args)
+        args = parse_args()
+        run(args)
     except KeyboardInterrupt:
         pass
     except ValueError as e:

@@ -8,7 +8,6 @@ import time
 from . import SEGMENT_SIZE, CIPHER_DIFF, CIPHER_SEGMENT_SIZE
 from .sodium import (chacha20poly1305_encrypt as segment_encrypt,
                      chacha20poly1305_decrypt as segment_decrypt)
-from .fetcher import fetcher
 
 LOG = logging.getLogger(__name__)
 

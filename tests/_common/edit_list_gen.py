@@ -86,7 +86,7 @@ if __name__ == '__main__':
     outfile = sys.stdout.buffer
 
     h = header.construct(version, seckey, [recipient_pubkey],
-                         session_key, seqnum, edits, None, None)
+                         session_key, seqnum, edits, None)
 
     outfile.write(h)
 

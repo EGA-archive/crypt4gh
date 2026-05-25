@@ -189,15 +189,8 @@ class LimitedOutput():
 
 
 def decrypt(infile, outfile,
-            session_keys, edit_list, link,
+            session_keys, edit_list,
             version=1):
-
-    # Infile in now positioned at the beginning of the data portion
-    # or we fetch the data portion from the URI.
-    if link:
-        # replacing the infile with a fetcher
-        infile = fetcher(link)
-        # Note: the remainder of the infile might not be empty, and therefore discarded
 
     if edit_list is None:
         return _decrypt(infile, outfile, session_keys, version=version)

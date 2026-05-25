@@ -30,7 +30,7 @@ function teardown() {
     # Bob encrypts it for Alice
     crypt4gh encrypt --passphrase-from-env BOB_PASSPHRASE \
                      --sk $TESTFILES/bob.sshkey \
-		     --recipient_pk ${ALICE_PUBKEY} \
+		     --recipient-pk ${ALICE_PUBKEY} \
 		     < $TESTFILES/random.10MB \
 		     > $TESTFILES/random.10MB.c4gh
 
@@ -60,7 +60,7 @@ function teardown() {
     # Bob encrypts it for Alice
     crypt4gh encrypt --passphrase-from-env BOB_PASSPHRASE \
                      --sk ${BOB_SECKEY} \
-		     --recipient_pk $TESTFILES/alice.sshkey.pub \
+		     --recipient-pk $TESTFILES/alice.sshkey.pub \
 		     < $TESTFILES/random.10MB \
 		     > $TESTFILES/random.10MB.c4gh
 
@@ -93,7 +93,7 @@ function teardown() {
     # Bob encrypts it for Alice
     crypt4gh encrypt --passphrase-from-env BOB_PASSPHRASE \
                      --sk $TESTFILES/bob.sshkey \
-		     --recipient_pk $TESTFILES/alice.sshkey.pub \
+		     --recipient-pk $TESTFILES/alice.sshkey.pub \
 		     < $TESTFILES/random.10MB \
 		     > $TESTFILES/random.10MB.c4gh
 

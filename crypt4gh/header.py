@@ -3,6 +3,8 @@
 
 import os
 import logging
+import time
+from datetime import datetime
 # from types import GeneratorType
 
 from . import sodium, SEGMENT_SIZE, CIPHER_DIFF, SUPPORTED_VERSIONS
@@ -207,7 +209,6 @@ def make_packet_timestamp(timestamp):
 def parse_packet_timestamp(packet):
     if len(packet) != 8:
         raise ValueError('Invalid timestamp packet length')
-    # return datetime.datetime.fromtimestamp(int.from_bytes(packet, byteorder='little'))
     return int.from_bytes(packet, byteorder='little')
 
 

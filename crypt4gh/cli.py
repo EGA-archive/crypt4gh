@@ -15,7 +15,7 @@ from .keys import get_public_key, get_private_key
 
 LOG = logging.getLogger(__name__)
 
-DEFAULT_LOG  = os.getenv('C4GH_LOG', 'NOTSET')
+DEFAULT_LOG  = os.getenv('C4GH_LOG', None)
 DEFAULT_SK  = os.getenv('C4GH_SECRET_KEY', None)
 
 def parse_args():
@@ -84,9 +84,10 @@ Environment variables:
     args = parser.parse_args(sys.argv[1:])
 
     # Logging for the root logger
-    logging.basicConfig(stream=sys.stderr,
-                        level=logging.getLevelName(DEFAULT_LOG),
-                        format='[%(module)s][%(levelname)s] %(message)s')
+    if DEFAULT_LOG:
+        logging.basicConfig(stream=sys.stderr,
+                            level=logging.getLevelName(DEFAULT_LOG),
+                            format='[%(module)s][%(levelname)s] %(message)s')
 
     if args.log and os.path.exists(args.log):
         with open(args.log, 'rt') as stream:

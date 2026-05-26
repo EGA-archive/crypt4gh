@@ -25,13 +25,15 @@ class URLFetcher():
             LOG.error('%r', e)
             raise ValueError(e.reason)
 
-    def read(self, size=-1):
-        if size < 0:
-            return self.response.read()
-        return self.response.read(size)
+    # def read(self, size=-1):
+    #     if size < 0:
+    #         return self.response.read()
+    #     return self.response.read(size)
 
     def readinto(self, data):
-        return self.response.readinto(data)
+        n = self.response.readinto(data)
+        # LOG.debug('fetched: %s', data[:n])
+        return n
 
     def close(self):
         return self.response.close()

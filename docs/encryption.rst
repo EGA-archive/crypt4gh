@@ -41,3 +41,5 @@ We hoist up the writer's public key in version 2, and therefore only one writer 
 We also introduce an expiration packet. We are aware that controlling expiration is a complex task, sometimes not even feasable since you can set the date and time as preferred. This package does check againt the current date/time and discard the file is the header packet has expired.
 
 A random initial sequence number (of 8 bits) is generated as the expiration timestamp.
+
+Finally, the ``link`` packet allows to _not_ attach the payload and only point to it. Specific code must be written to retrieve the payload and we only include a simple URI fetcher (ie we can use URI of the form ``file:///absolute/path/to/file`` or ``https://fqdn/path/to/file`` for example).

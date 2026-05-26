@@ -50,6 +50,8 @@ Environment variables:
                                 help="Where to write the header (default: stdout)")
     parser_encrypt.add_argument('--expiration', metavar='<data>', dest='expiration',
                                 help="Expiration date (in ISO format)")
+    parser_encrypt.add_argument('--link', metavar='<uri>', dest='uri',
+                                help="Fully Qualified URI Path to the payload location")
 
     # create the parser for the "decrypt" command
     parser_decrypt = subparsers.add_parser('decrypt')
@@ -74,6 +76,8 @@ Environment variables:
                                   help="Recipient's Curve25519-based Public key")
     parser_reencrypt.add_argument('--header-only', action='store_true', dest='header_only', default=False,
                                   help='Whether the input data consists only of a header (default: false)')
+    parser_reencrypt.add_argument('--link', metavar='<uri>', dest='uri',
+                                  help="Fully Qualified URI Path to the payload location")
     parser_reencrypt.add_argument('--chunk-size', metavar='<size>', dest='chunksize', type=int, default=1<<23,
                                   help='Buffer transfer size (in bytes)')
     parser_reencrypt.add_argument('--infile', metavar="<path>", dest='infile',
@@ -92,6 +96,13 @@ Environment variables:
     if args.log and os.path.exists(args.log):
         with open(args.log, 'rt') as stream:
             dictConfig(json.load(stream))
+
+    # Extra consistency checks
+    if args.command == 'encrypt' and args.uri is not None and args.header is None:
+        raise ValueError('encrypt: --link requires --header')
+
+    if args.command == 'reencrypt' and args.uri is not None and not args.header_only:
+        raise ValueError('reencrypt: --link requires --header-only')
 
     return args
 

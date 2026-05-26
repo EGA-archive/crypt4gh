@@ -15,10 +15,9 @@ def encrypt(args):
 
     recipient_keys = cli.retrieve_recipients(args)
     seckey = cli.retrieve_private_key(args, generate=True)
-
     timestamp = cli.retrieve_expiration(args)
 
-    # Construct a header with random session key
+q    # Construct a header with random session key
     version = 1
     session_key = os.urandom(32)
     seqnum = None
@@ -32,7 +31,7 @@ def encrypt(args):
         #     seqnum = random.randint(0, 1<<32)
 
     h = header.construct(version, seckey, recipient_keys,
-                         session_key, seqnum, None, timestamp)
+                         session_key, seqnum, None, timestamp, args.uri))
 
     infile = sys.stdin.buffer
     outfile = sys.stdout.buffer
@@ -76,6 +75,7 @@ def reencrypt(args):
     # Decrypt and re-encrypt the header
     h = header.reencrypt(infile, seckey, recipient_keys,
                          sender_pubkey = sender_pubkey,
+                         uri = args.uri,
                          version= 2 if args.v2 else 1)
     outfile.write(h)
 

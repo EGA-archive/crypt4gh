@@ -8,6 +8,7 @@ import time
 from . import SEGMENT_SIZE, CIPHER_DIFF, CIPHER_SEGMENT_SIZE
 from .sodium import (chacha20poly1305_encrypt as segment_encrypt,
                      chacha20poly1305_decrypt as segment_decrypt)
+from .fetcher import fetcher
 
 LOG = logging.getLogger(__name__)
 
@@ -188,8 +189,13 @@ class LimitedOutput():
 
 
 def decrypt(infile, outfile,
-            session_keys, edit_list,
+            session_keys, edit_list, link,
             version=1):
+
+    if link is not None:
+        # replacing the infile with a fetcher
+        infile = fetcher(link)
+        # Note: the remainder of the infile might not be empty, and therefore discarded
 
     if edit_list is None:
         return _decrypt(infile, outfile, session_keys, version=version)

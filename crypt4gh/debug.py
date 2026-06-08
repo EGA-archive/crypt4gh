@@ -68,8 +68,8 @@ def run(args):
     infile = sys.stdin.buffer
     outfile = sys.stdout.buffer
 
-    version, data_encryptions, edits, timestamp = header.deconstruct(infile, seckey,
-                                                                     sender_pubkey=sender_pubkey)
+    version, data_encryptions, edits, timestamp, uri = header.deconstruct(infile, seckey,
+                                                                          sender_pubkey=sender_pubkey)
 
     print('# Header version:', version)
     print('# Data encryption packets')
@@ -89,6 +89,9 @@ def run(args):
     if timestamp is not None:
         expiration = datetime.fromtimestamp(timestamp)
         print('# Expiration:', expiration)
+
+    if uri is not None:
+        print('# Payload URI:', uri)
 
     # Scanning through the remainder and print the number of data blocks
     count = 0

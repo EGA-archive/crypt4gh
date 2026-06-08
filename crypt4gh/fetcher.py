@@ -41,9 +41,12 @@ class URLFetcher():
 
 def fetcher(link):
 
-    LOG.info('Fetching URI: %s', link)
+    LOG.info('URI: %s', link)
 
     if link.startswith('s3://'):
         return NotImplementedError('S3 URI require more thoughts ... and parameters')
+
+    if link.startswith('file://'):
+        return open(link[7:], 'rb')
 
     return URLFetcher(link)

@@ -142,7 +142,7 @@ crypt4gh_chacha20poly1305_decrypt(PyObject* self, PyObject* args)
     ciphersegment = (uint8_t *)ciphersegment_view.buf;
     ciphersegment_len = ciphersegment_view.len;
 
-    if (ciphersegment_len <= CIPHER_DIFF
+    if (ciphersegment_len < CIPHER_DIFF
 	|| segment_len < ciphersegment_len - CIPHER_DIFF) {
       PyErr_SetString(PyExc_AssertionError, "Invalid buffer sizes");
       goto bailout;

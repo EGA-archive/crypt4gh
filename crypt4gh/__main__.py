@@ -32,6 +32,7 @@ def encrypt(args):
 
     h = header.construct(version, seckey, recipient_keys,
                          session_key, seqnum, None, timestamp, args.uri)
+    LOG.debug('Header size: %d', len(h))
 
     infile = sys.stdin.buffer
     outfile = sys.stdout.buffer
@@ -59,7 +60,8 @@ def decrypt(args):
     version, data_encryptions, edits, _, uri = header.deconstruct(infile, seckey,
                                                                   sender_pubkey=sender_pubkey)
 
-    return payload.decrypt(infile, outfile, data_encryptions, edits, uri, version=version)
+    return payload.decrypt(infile, outfile, data_encryptions, edits, uri,
+                           version=version)
 
 
 def reencrypt(args):

@@ -53,10 +53,13 @@ def encrypt(infile, outfile, session_key, start):
             if start is not None: # one more "empty" segment
                 clen = segment_encrypt(ciphersegment, b'', session_key, next(snum))
                 outfile.write(ciphersegment[:clen])
+                LOG.debug('ciphersegment: (final) [%d] %s', clen, ciphersegment[:min(10,clen)])
             break
 
         clen = segment_encrypt(ciphersegment, segment[:dlen], session_key, next(snum))
         outfile.write(ciphersegment[:clen])
+
+        LOG.debug('ciphersegment: [%d] %s', clen, ciphersegment[:min(10,clen)])
 
         if dlen < SEGMENT_SIZE: # not a full segment
             break
@@ -91,8 +94,12 @@ def _decrypt(infile, outfile, session_keys, version=1):
 
     while True:
         clen = infile.readinto(ciphersegment)
+        LOG.debug('ciphersegment: [%d] %s', clen, ciphersegment[:min(10,clen)])
+
         if clen == 0:
+            LOG.debug('last plen: %d', plen)
             if version == 2 and plen == SEGMENT_SIZE: # plen != 0:
+                LOG.warning('Missing final segment and/or file truncated')
                 raise ValueError('Missing final segment (for version 2)')
             break # no more data
         assert( clen >= CIPHER_DIFF )
@@ -198,14 +205,16 @@ def decrypt(infile, outfile,
         # Note: the remainder of the infile might not be empty, and therefore discarded
 
     if edit_list is None:
-        return _decrypt(infile, outfile, session_keys, version=version)
+        _decrypt(infile, outfile, session_keys, version=version)
+    else:
+        _outfile = LimitedOutput(outfile, edit_list)
+        try:
+            _decrypt(infile, _outfile, session_keys, version=version)
+        except ProcessingOver:
+            LOG.info('Decryption Successful (stopped with edit list)')
 
-    _outfile = LimitedOutput(outfile, edit_list)
-    try:
-        return _decrypt(infile, _outfile, session_keys, version=version)
-    except ProcessingOver:
-        LOG.info('Decryption Successful (stopped with edit list)')
-
+    if link is not None:
+        infile.close()
 
 
 ##############################################################
